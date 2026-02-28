@@ -1,4 +1,4 @@
-import type { User } from '../types/user';
+import type { User, UserWithApplication } from '../types/user';
 import { api } from './api';
 
 export type RegisterPayload = {
@@ -34,6 +34,11 @@ export const authService = {
 
   async getMe(): Promise<User> {
     const response = await api.get<{ user: User }>('/users/me');
+    return response.data.user;
+  },
+
+  async getMeAllData(): Promise<UserWithApplication> {
+    const response = await api.get<{ user: UserWithApplication }>('/users/me/all');
     return response.data.user;
   }
 };

@@ -1,0 +1,34 @@
+-- AlterTable
+ALTER TABLE "Application"
+ADD COLUMN "applicationType" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "dateOfBirth" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "gender" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "countryCode" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "phoneNumber" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "nationality" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "countryOfResidence" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "stateOrProvince" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "residentialAddress" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "passportNumber" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "passportExpiryDate" TEXT NOT NULL DEFAULT '',
+ADD COLUMN "skillOrProfession" TEXT,
+ADD COLUMN "universityName" TEXT,
+ADD COLUMN "universityCountry" TEXT,
+ADD COLUMN "courseName" TEXT,
+ADD COLUMN "degreeType" TEXT,
+ADD COLUMN "studyMode" TEXT,
+ADD COLUMN "intake" TEXT,
+ADD COLUMN "applicationDate" TEXT;
+
+ALTER TABLE "Application"
+ALTER COLUMN "applicationType" DROP DEFAULT,
+ALTER COLUMN "dateOfBirth" DROP DEFAULT,
+ALTER COLUMN "gender" DROP DEFAULT,
+ALTER COLUMN "countryCode" DROP DEFAULT,
+ALTER COLUMN "phoneNumber" DROP DEFAULT,
+ALTER COLUMN "nationality" DROP DEFAULT,
+ALTER COLUMN "countryOfResidence" DROP DEFAULT,
+ALTER COLUMN "stateOrProvince" DROP DEFAULT,
+ALTER COLUMN "residentialAddress" DROP DEFAULT,
+ALTER COLUMN "passportNumber" DROP DEFAULT,
+ALTER COLUMN "passportExpiryDate" DROP DEFAULT;

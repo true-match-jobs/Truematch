@@ -1,0 +1,158 @@
+import { api } from './api';
+
+export type ChatRole = 'USER' | 'ADMIN';
+
+export type ChatUser = {
+  id: string;
+  fullName: string;
+  email: string;
+  role: ChatRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  content: string;
+  createdAt: string;
+};
+
+export type ChatAttachment = {
+  url: string;
+  downloadUrl: string;
+  mimeType: string;
+  name: string;
+  previewUrl?: string;
+};
+
+export type AdminConversation = {
+  user: ChatUser;
+  lastMessageAt: string;
+  lastMessagePreview: string;
+  unreadMessageCount: number;
+};
+
+export type ChatUnreadSummary = {
+  userUnreadMessageCount: number;
+  adminUnreadUserCount: number;
+};
+
+export const CHAT_ATTACHMENT_PREFIX = '[ATTACHMENT]';
+
+type AttachmentMessagePayload = {
+  attachment: ChatAttachment;
+  text?: string;
+};
+
+const isValidAttachmentMessagePayload = (value: unknown): value is AttachmentMessagePayload => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+  const attachment = payload.attachment as Record<string, unknown> | undefined;
+
+  return Boolean(
+    attachment &&
+      typeof attachment.url === 'string' &&
+      typeof attachment.mimeType === 'string' &&
+      typeof attachment.name === 'string' &&
+      (attachment.previewUrl === undefined || typeof attachment.previewUrl === 'string')
+  );
+};
+
+export const encodeAttachmentMessageContent = (attachment: ChatAttachment, text?: string): string => {
+  return `${CHAT_ATTACHMENT_PREFIX}${JSON.stringify({
+    attachment,
+    text: text?.trim() || undefined
+  })}`;
+};
+
+export const decodeAttachmentMessageContent = (
+  content: string
+): { attachment: ChatAttachment; text?: string } | null => {
+  if (!content.startsWith(CHAT_ATTACHMENT_PREFIX)) {
+    return null;
+  }
+
+  const rawPayload = content.slice(CHAT_ATTACHMENT_PREFIX.length);
+
+  try {
+    const parsed = JSON.parse(rawPayload) as unknown;
+
+    if (!isValidAttachmentMessagePayload(parsed)) {
+      return null;
+    }
+
+    return {
+      attachment: parsed.attachment,
+      text: typeof parsed.text === 'string' ? parsed.text : undefined
+    };
+  } catch (_error) {
+    return null;
+  }
+};
+
+const resolveWsUrl = (): string => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+
+  if (apiBaseUrl.startsWith('http://') || apiBaseUrl.startsWith('https://')) {
+    const parsed = new URL(apiBaseUrl);
+    parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+    parsed.pathname = '/ws';
+    parsed.search = '';
+    parsed.hash = '';
+    return parsed.toString();
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}/ws`;
+};
+
+export const chatService = {
+  async getPeer(userId?: string): Promise<ChatUser> {
+    const response = await api.get<{ peer: ChatUser }>('/chat/peer', {
+      params: userId ? { userId } : undefined
+    });
+
+    return response.data.peer;
+  },
+
+  async getMessages(peerUserId: string): Promise<ChatMessage[]> {
+    const response = await api.get<{ messages: ChatMessage[] }>(`/chat/messages/${peerUserId}`);
+    return response.data.messages;
+  },
+
+  async getAdminConversations(): Promise<AdminConversation[]> {
+    const response = await api.get<{ conversations: AdminConversation[] }>('/chat/conversations');
+    return response.data.conversations;
+  },
+
+  async getUnreadSummary(): Promise<ChatUnreadSummary> {
+    const response = await api.get<{ summary: ChatUnreadSummary }>('/chat/unread-summary');
+    return response.data.summary;
+  },
+
+  async markConversationRead(peerUserId: string): Promise<void> {
+    await api.patch(`/chat/read/${peerUserId}`);
+  },
+
+  async uploadAttachment(file: File): Promise<ChatAttachment> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post<{ file: ChatAttachment }>('/chat/attachments', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    return response.data.file;
+  },
+
+  createSocket(): WebSocket {
+    return new WebSocket(resolveWsUrl());
+  }
+};

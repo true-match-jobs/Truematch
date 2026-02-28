@@ -8,6 +8,7 @@ import { Navbar } from '../../components/layout/Navbar';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../hooks/useAuth';
+import { useAuthStore } from '../../store/auth.store';
 
 const loginSchema = z.object({
   email: z.string().email('Enter a valid email'),
@@ -39,7 +40,8 @@ export const LoginPage = () => {
       setSubmitting(true);
       setErrorMessage(null);
       await login(values);
-      navigate('/dashboard');
+      const isAdmin = useAuthStore.getState().user?.role === 'ADMIN';
+      navigate(isAdmin ? '/admin/dashboard' : '/dashboard');
     } catch (_error) {
       setErrorMessage('Invalid email or password.');
     } finally {

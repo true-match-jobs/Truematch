@@ -1,6 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { Button } from '../ui/Button';
 
 export const Navbar = () => {
   const { pathname } = useLocation();
@@ -10,6 +9,7 @@ export const Navbar = () => {
   const firstName = user?.fullName.trim().split(/\s+/)[0] ?? 'User';
   const avatarSeed = user?.fullName || user?.id || 'guest';
   const avatarUrl = `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(avatarSeed)}`;
+  const loginTarget = user ? (user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard') : '/login';
 
   return (
     <header className="bg-dark-bg glass-border-b">
@@ -27,8 +27,11 @@ export const Navbar = () => {
 
         {!isDashboardRoute && (
           <div className="flex items-center gap-3">
-            <Link to="/dashboard">
-              <Button>Dashboard</Button>
+            <Link
+              to={loginTarget}
+              className="inline-flex items-center justify-center rounded-lg border-2 border-white/40 bg-transparent px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-white/5"
+            >
+              Login
             </Link>
           </div>
         )}
