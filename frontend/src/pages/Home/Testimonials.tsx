@@ -1,4 +1,3 @@
-import { Quotes } from '@phosphor-icons/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type Testimonial = {
@@ -57,24 +56,21 @@ export const Testimonials = () => {
 
         <div className="relative mx-auto max-w-4xl rounded-2xl p-6 sm:p-8">
           <div key={activeIndex} className="animate-fade-in flex flex-col items-center text-center">
-            <div className="relative mt-5 w-full max-w-2xl px-8 text-zinc-300 sm:px-10">
-              <Quotes
-                size={18}
-                weight="fill"
-                className="absolute left-0 top-0 text-brand-500"
-                aria-hidden
-              />
-              <p className="text-base leading-relaxed sm:text-lg">{active.quote}</p>
-            </div>
-
             <img
               src={active.image}
               alt={active.name}
-              className="mt-6 h-20 w-20 rounded-full object-cover ring-2 ring-white/10 sm:h-24 sm:w-24"
+              className="mt-3 h-20 w-20 rounded-full object-cover ring-2 ring-white/10 sm:h-24 sm:w-24"
               loading="lazy"
             />
-            <p className="mt-3 text-base font-semibold text-zinc-100">{active.name}</p>
-            <p className="text-sm text-zinc-400">{active.location}</p>
+
+            <div className="mt-6 w-full max-w-2xl px-2 text-zinc-300 sm:px-4">
+              <p className="text-base leading-relaxed sm:text-lg">&quot;{active.quote}&quot;</p>
+            </div>
+
+            <div className="mt-4">
+              <p className="text-base font-semibold text-zinc-100">{active.name}</p>
+              <p className="text-sm text-zinc-400">{active.location}</p>
+            </div>
           </div>
 
           <div className="mt-7 flex items-center justify-center gap-2">
@@ -87,7 +83,7 @@ export const Testimonials = () => {
                   type="button"
                   onClick={() => setActiveIndex(index)}
                   aria-label={`Show testimonial ${index + 1}`}
-                  className={`h-2 w-2 rounded-full transition-[transform,background-color] duration-300 ease-out ${isActive ? 'scale-125 bg-white' : 'bg-zinc-600 hover:bg-zinc-500'}`}
+                  className={`h-2 w-2 rounded-full transition-colors duration-300 ease-out ${isActive ? 'bg-white' : 'bg-zinc-600 hover:bg-zinc-500'}`}
                 />
               );
             })}

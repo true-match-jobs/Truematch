@@ -3,7 +3,8 @@ import { searchUniversityNames } from './university.service';
 
 export const searchUniversityNamesHandler = async (req: Request, res: Response): Promise<void> => {
   const query = typeof req.query.query === 'string' ? req.query.query : '';
-  const names = await searchUniversityNames(query);
+  const country = typeof req.query.country === 'string' ? req.query.country : undefined;
+  const names = await searchUniversityNames(query, country);
 
   res.status(200).json({
     names

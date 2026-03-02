@@ -39,7 +39,6 @@ export const StepPassportDetails = ({ onSubmit, onBack, loading, initialValues }
         label="Passport Number"
         placeholder="A12345678"
         error={errors.passportNumber?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('passportNumber')}
       />
       <Input
@@ -47,7 +46,6 @@ export const StepPassportDetails = ({ onSubmit, onBack, loading, initialValues }
         type="date"
         label="Passport Expiry Date"
         error={errors.passportExpiryDate?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('passportExpiryDate')}
       />
 

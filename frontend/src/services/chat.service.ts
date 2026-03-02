@@ -6,6 +6,7 @@ export type ChatUser = {
   id: string;
   fullName: string;
   email: string;
+  profilePhotoUrl: string | null;
   role: ChatRole;
   createdAt: string;
   updatedAt: string;
@@ -150,6 +151,35 @@ export const chatService = {
     });
 
     return response.data.file;
+  },
+
+  async fetchAttachmentBlob(attachment: ChatAttachment): Promise<Blob> {
+    const response = await api.post<Blob>(
+      '/chat/attachments/download',
+      {
+        url: attachment.url,
+        name: attachment.name,
+        mimeType: attachment.mimeType
+      },
+      {
+        responseType: 'blob'
+      }
+    );
+
+    return response.data;
+  },
+
+  async downloadAttachment(attachment: ChatAttachment): Promise<void> {
+    const blob = await this.fetchAttachmentBlob(attachment);
+    const blobUrl = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = attachment.name;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(blobUrl);
   },
 
   createSocket(): WebSocket {

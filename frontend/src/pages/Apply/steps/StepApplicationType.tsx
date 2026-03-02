@@ -17,9 +17,10 @@ type Props = {
   onBack?: () => void;
   loading: boolean;
   initialValues?: Partial<StepApplicationTypeValues>;
+  submitLabel?: string;
 };
 
-export const StepApplicationType = ({ onSubmit, onBack, loading, initialValues }: Props) => {
+export const StepApplicationType = ({ onSubmit, onBack, loading, initialValues, submitLabel = 'Continue' }: Props) => {
   const {
     register,
     handleSubmit,
@@ -81,7 +82,7 @@ export const StepApplicationType = ({ onSubmit, onBack, loading, initialValues }
           </Button>
         ) : null}
         <Button type="submit" fullWidth disabled={loading}>
-          {loading ? 'Saving...' : 'Continue'}
+          {loading ? 'Saving...' : submitLabel}
         </Button>
       </div>
     </form>

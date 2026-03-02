@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../../utils/app-error';
 import {
+  downloadChatAttachmentFile,
   getAdminConversations,
   getConversationMessages,
   getUnreadSummary,
@@ -93,4 +94,31 @@ export const uploadChatAttachmentHandler = async (req: Request, res: Response): 
   res.status(200).json({
     file: uploadedFile
   });
+};
+
+export const downloadChatAttachmentHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const { url, name, mimeType } = req.body as {
+    url?: unknown;
+    name?: unknown;
+    mimeType?: unknown;
+  };
+
+  if (typeof url !== 'string' || typeof name !== 'string') {
+    throw new AppError(400, 'Attachment URL and filename are required');
+  }
+
+  const downloadedFile = await downloadChatAttachmentFile({
+    url,
+    name,
+    mimeType: typeof mimeType === 'string' ? mimeType : undefined
+  });
+
+  res.setHeader('Content-Type', downloadedFile.contentType);
+  res.setHeader('Content-Disposition', `attachment; filename="${downloadedFile.fileName}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.status(200).send(downloadedFile.buffer);
 };

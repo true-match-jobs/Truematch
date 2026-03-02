@@ -8,6 +8,7 @@ export type AuthState = {
   isAuthenticated: boolean;
   isBootstrapping: boolean;
   setSessionUser: (user: User) => void;
+  clearSession: () => void;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => Promise<void>;
@@ -21,6 +22,11 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   setSessionUser: (user) => {
     set({ user, isAuthenticated: true, isBootstrapping: false });
+  },
+
+  clearSession: () => {
+    useDashboardStore.getState().clearDashboardData();
+    set({ user: null, isAuthenticated: false, isBootstrapping: false });
   },
 
   login: async (payload) => {

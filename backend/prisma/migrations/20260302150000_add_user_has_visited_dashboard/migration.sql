@@ -1,0 +1,2 @@
+ALTER TABLE "User"
+ADD COLUMN "hasVisitedDashboard" BOOLEAN NOT NULL DEFAULT false;

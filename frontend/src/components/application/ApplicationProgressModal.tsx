@@ -10,6 +10,7 @@ type Props = {
   onClose: () => void;
   applicationStatus: ApplicationStatus;
   universityName: string;
+  universityCountry?: string | null;
 };
 
 const STATUS_LABELS: Record<ApplicationStatus, string> = {
@@ -17,6 +18,32 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   [APPLICATION_STATUS.SUBMITTED_TO_UNIVERSITY]: 'Submitted to University',
   [APPLICATION_STATUS.UNDER_REVIEW]: 'Under Review',
   [APPLICATION_STATUS.OFFER_ISSUED]: 'Offer Issued'
+};
+
+const getOfferIssuedLabelByCountry = (universityCountry?: string | null) => {
+  const normalizedCountry = universityCountry?.trim().toLowerCase();
+
+  if (normalizedCountry === 'united states') {
+    return 'Admission Letter';
+  }
+
+  if (normalizedCountry === 'canada') {
+    return 'Letter of Acceptance (LOA)';
+  }
+
+  if (normalizedCountry === 'united kingdom' || normalizedCountry === 'australia') {
+    return 'Offer Letter';
+  }
+
+  return STATUS_LABELS[APPLICATION_STATUS.OFFER_ISSUED];
+};
+
+const getStatusLabel = (step: ApplicationStatus, universityCountry?: string | null) => {
+  if (step === APPLICATION_STATUS.OFFER_ISSUED) {
+    return getOfferIssuedLabelByCountry(universityCountry);
+  }
+
+  return STATUS_LABELS[step];
 };
 
 const getCompletedStageDescription = (step: ApplicationStatus, universityName: string): string => {
@@ -34,7 +61,7 @@ const getCompletedStageDescription = (step: ApplicationStatus, universityName: s
   }
 };
 
-export const ApplicationProgressModal = ({ isOpen, onClose, applicationStatus, universityName }: Props) => {
+export const ApplicationProgressModal = ({ isOpen, onClose, applicationStatus, universityName, universityCountry }: Props) => {
   if (!isOpen) {
     return null;
   }
@@ -82,8 +109,8 @@ export const ApplicationProgressModal = ({ isOpen, onClose, applicationStatus, u
             const isLast = index === STATUS_STEPS.length - 1;
 
             return (
-              <div key={step} className={`relative flex items-start gap-3 ${isLast ? '' : 'pb-10'}`}>
-                <div className="relative flex w-7 justify-center">
+              <div key={step} className={`relative flex gap-3 ${isLast ? '' : 'pb-6'}`}>
+                <div className="relative flex w-7 shrink-0 justify-center">
                   <div
                     className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
                       isCompleted ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
@@ -91,10 +118,10 @@ export const ApplicationProgressModal = ({ isOpen, onClose, applicationStatus, u
                   >
                     {index + 1}
                   </div>
-                  {!isLast && <div className="absolute left-1/2 top-[20px] h-[calc(100%+4.5rem)] w-px -translate-x-1/2 bg-white/15" />}
+                  {!isLast ? <div className="absolute -bottom-6 left-1/2 top-7 w-px -translate-x-1/2 bg-white/15" /> : null}
                 </div>
                 <div className="pt-0.5">
-                  <p className="text-sm font-medium text-zinc-100">{STATUS_LABELS[step]}</p>
+                  <p className="text-sm font-medium text-zinc-100">{getStatusLabel(step, universityCountry)}</p>
                   <p className="mt-0.5 text-xs uppercase tracking-wide text-zinc-400">{description}</p>
                   {isCompleted ? (
                     <p className="mt-1 text-xs text-zinc-400">{getCompletedStageDescription(step, resolvedUniversityName)}</p>

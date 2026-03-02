@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../../utils/app-error';
 import { clearAuthCookies, setAuthCookies } from '../../utils/jwt';
-import { login, refreshAuth, register } from './auth.service';
+import { login, refreshAuth, register, resendEmailVerification, verifyEmailAddress } from './auth.service';
 import { loginSchema, registerSchema } from './auth.validation';
 
 export const registerHandler = async (req: Request, res: Response): Promise<void> => {
@@ -35,16 +35,47 @@ export const refreshHandler = async (req: Request, res: Response): Promise<void>
     throw new AppError(401, 'Refresh token missing');
   }
 
-  const authData = await refreshAuth(refreshToken);
-  setAuthCookies(res, authData.accessToken, authData.refreshToken);
+  try {
+    const authData = await refreshAuth(refreshToken);
+    setAuthCookies(res, authData.accessToken, authData.refreshToken);
 
-  res.status(200).json({
-    message: 'Session refreshed',
-    user: authData.user
-  });
+    res.status(200).json({
+      message: 'Session refreshed',
+      user: authData.user
+    });
+  } catch (error) {
+    clearAuthCookies(res);
+    throw error;
+  }
 };
 
 export const logoutHandler = (_req: Request, res: Response): void => {
   clearAuthCookies(res);
   res.status(200).json({ message: 'Logout successful' });
+};
+
+export const verifyEmailHandler = async (req: Request, res: Response): Promise<void> => {
+  const token = typeof req.query.token === 'string' ? req.query.token.trim() : '';
+
+  if (!token) {
+    throw new AppError(400, 'Verification token is required');
+  }
+
+  await verifyEmailAddress(token);
+
+  res.status(200).json({
+    message: 'Email verified successfully'
+  });
+};
+
+export const resendEmailVerificationHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  await resendEmailVerification(req.user.userId);
+
+  res.status(200).json({
+    message: 'Verification email sent'
+  });
 };

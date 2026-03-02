@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import type { AxiosError } from 'axios';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import type { ApplicationStatus } from '../../../../shared/applicationStatus';
@@ -16,6 +17,7 @@ export const Hero = () => {
   const [trackerError, setTrackerError] = useState<string | null>(null);
   const [trackerStatus, setTrackerStatus] = useState<ApplicationStatus | null>(null);
   const [trackerUniversityName, setTrackerUniversityName] = useState<string>('');
+  const [trackerUniversityCountry, setTrackerUniversityCountry] = useState<string | null>(null);
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
 
   const handleTrackerSearch = async () => {
@@ -32,6 +34,7 @@ export const Hero = () => {
       const tracker = await applicationService.getTrackerStatus(trimmedApplicationId);
       setTrackerStatus(tracker.applicationStatus);
       setTrackerUniversityName(tracker.universityName ?? '');
+      setTrackerUniversityCountry(tracker.universityCountry ?? null);
       setIsTrackerOpen(true);
 
       if (isAuthenticated && user?.role === 'USER') {
@@ -42,8 +45,15 @@ export const Hero = () => {
           return;
         }
       }
-    } catch (_error) {
-      setTrackerError('Application not found. Please check the ID and try again.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      const backendMessage = axiosError.response?.data?.message;
+
+      if (backendMessage === 'Tracker is available for study applications only') {
+        setTrackerError('Tracking is available for study applications only.');
+      } else {
+        setTrackerError('Application not found. Please check the ID and try again.');
+      }
     } finally {
       setIsSearching(false);
     }
@@ -111,6 +121,7 @@ export const Hero = () => {
           onClose={() => setIsTrackerOpen(false)}
           applicationStatus={trackerStatus}
           universityName={trackerUniversityName}
+          universityCountry={trackerUniversityCountry}
         />
       ) : null}
     </section>

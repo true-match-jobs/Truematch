@@ -12,33 +12,20 @@ export type ApplicationDocumentType =
   | 'referenceLetters'
   | 'portfolio'
   | 'applicationFeeReceipt'
-  | 'offerLetter'
-  | 'casLetter'
-  | 'visaDecisionLetter'
   | 'proofOfFunds';
 
 export type Application = {
   id: string;
   userId: string;
   applicationType: 'study_scholarship' | 'work_employment';
-  dateOfBirth: string;
-  gender: string;
-  countryCode: string;
-  phoneNumber: string;
-  nationality: string;
-  countryOfResidence: string;
-  stateOrProvince: string;
-  residentialAddress: string;
-  passportNumber: string;
-  passportExpiryDate: string;
   skillOrProfession: string | null;
+  workCountry: string | null;
   universityName: string | null;
   universityCountry: string | null;
   courseName: string | null;
   degreeType: string | null;
   studyMode: string | null;
   intake: string | null;
-  applicationDate: string | null;
   internationalPassportUrl: string | null;
   academicTranscriptsUrl: string | null;
   degreeCertificatesUrl: string | null;
@@ -48,10 +35,14 @@ export type Application = {
   referenceLettersUrl: string | null;
   portfolioUrl: string | null;
   applicationFeeReceiptUrl: string | null;
-  offerLetterUrl: string | null;
-  casLetterUrl: string | null;
-  visaDecisionLetterUrl: string | null;
   proofOfFundsUrl: string | null;
+  ukCasStatus: string | null;
+  australiaCoeStatus: string | null;
+  usaI20Status: string | null;
+  canadaLoaStatus: string | null;
+  shouldShowOfferFields?: boolean;
+  offerTypeLabel?: string;
+  offerDateLabel?: string;
   hasViewedTracker: boolean;
   applicationStatus: ApplicationStatus;
   createdAt: string;
@@ -62,6 +53,19 @@ export type User = {
   id: string;
   fullName: string;
   email: string;
+  dateOfBirth: string | null;
+  gender: string | null;
+  countryCode: string | null;
+  phoneNumber: string | null;
+  nationality: string | null;
+  countryOfResidence: string | null;
+  stateOrProvince: string | null;
+  residentialAddress: string | null;
+  passportNumber: string | null;
+  passportExpiryDate: string | null;
+  emailVerifiedAt: string | null;
+  profilePhotoUrl: string | null;
+  hasVisitedDashboard: boolean;
   role: UserRole;
   createdAt: string;
   updatedAt: string;
@@ -71,13 +75,15 @@ export type AssignedAdmin = {
   id: string;
   fullName: string;
   email: string;
+  profilePhotoUrl: string | null;
   role: UserRole;
   createdAt: string;
   updatedAt: string;
 };
 
 export type UserWithApplication = User & {
+  applications: Application[];
   application: Application | null;
   assignedAdmin: AssignedAdmin | null;
-  hasUploadedPassport: boolean;
+  hasUploadedAnyDocument: boolean;
 };

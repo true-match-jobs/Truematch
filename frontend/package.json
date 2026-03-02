@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:logo-assets": "node ./scripts/generate-logo-assets.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.2",
@@ -28,6 +29,8 @@
     "autoprefixer": "^10.4.20",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
+    "png-to-ico": "^2.1.8",
+    "sharp": "^0.34.3",
     "typescript": "^5.8.2",
     "vite": "^6.2.2"
   }

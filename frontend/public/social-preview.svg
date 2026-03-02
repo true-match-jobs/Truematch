@@ -1,0 +1,22 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">TrueMatch Study and Work Abroad</title>
+  <desc id="desc">TrueMatch supports university admissions, scholarship guidance, visa preparation, and work abroad opportunities.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="72" y1="482" x2="532" y2="142" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0284C7"/>
+      <stop offset="1" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="220" cy="130" r="280" fill="url(#accent)" fill-opacity="0.25"/>
+  <circle cx="980" cy="540" r="260" fill="url(#accent)" fill-opacity="0.18"/>
+  <rect x="64" y="64" width="1072" height="502" rx="28" fill="#0B1220" fill-opacity="0.55" stroke="#334155"/>
+  <text x="116" y="190" fill="#22D3EE" font-size="34" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="600">TRUE MATCH</text>
+  <text x="116" y="290" fill="#F8FAFC" font-size="62" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="700">Study Abroad &amp; Work</text>
+  <text x="116" y="356" fill="#F8FAFC" font-size="62" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="700">Opportunities</text>
+  <text x="116" y="430" fill="#CBD5E1" font-size="30" font-family="Inter, Segoe UI, Arial, sans-serif">University Admissions • Scholarships • Visa Guidance • Employment Support</text>
+</svg>

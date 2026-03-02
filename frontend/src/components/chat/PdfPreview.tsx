@@ -1,22 +1,21 @@
+import { FilePdf } from '@phosphor-icons/react';
+import type { ChatAttachment } from '../../services/chat.service';
+
 type PdfPreviewProps = {
-  previewUrl?: string;
+  attachment: ChatAttachment;
   pageWidth?: number;
   className?: string;
 };
 
-export const PdfPreview = ({ previewUrl, pageWidth = 260, className = '' }: PdfPreviewProps) => {
+export const PdfPreview = ({ attachment, pageWidth = 260, className = '' }: PdfPreviewProps) => {
+  void attachment;
+  void pageWidth;
+
   return (
     <div className={`overflow-hidden rounded-lg bg-zinc-900 ${className}`}>
-      {previewUrl ? (
-        <img
-          src={previewUrl}
-          alt="PDF preview"
-          style={{ width: `${pageWidth}px` }}
-          className="h-auto max-w-full"
-        />
-      ) : (
-        <div className="flex h-32 items-center justify-center px-3 text-xs text-zinc-300">PDF preview unavailable</div>
-      )}
+      <div className="flex h-20 w-full items-center justify-center rounded-md border border-white/10 bg-black/20">
+        <FilePdf size={44} weight="fill" className="text-rose-400" aria-hidden="true" />
+      </div>
     </div>
   );
 };

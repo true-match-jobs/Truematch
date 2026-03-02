@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { chatService, type AdminConversation } from '../../services/chat.service';
+import { buildInitialAvatarUrl } from '../../utils/avatar';
 
 export const AdminDashboardConversationsPage = () => {
   const [conversations, setConversations] = useState<AdminConversation[]>([]);
@@ -89,7 +90,13 @@ export const AdminDashboardConversationsPage = () => {
                 className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-white/5"
               >
                 <img
-                  src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${conversation.user.id}`}
+                  src={buildInitialAvatarUrl({
+                    fullName: conversation.user.fullName,
+                    email: conversation.user.email,
+                    id: conversation.user.id,
+                    fallback: 'User',
+                    size: 44
+                  })}
                   alt={`${conversation.user.fullName} avatar`}
                   className="h-11 w-11 rounded-full bg-dark-surface"
                 />

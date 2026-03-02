@@ -7,6 +7,13 @@ type WsInboundMessage = {
   type: 'private_message';
   toUserId: string;
   content: string;
+} | {
+  type: 'presence_subscribe';
+  userIds: string[];
+} | {
+  type: 'typing';
+  toUserId: string;
+  isTyping: boolean;
 };
 
 type WsOutboundMessage = {
@@ -16,9 +23,26 @@ type WsOutboundMessage = {
   toUserId: string;
   content: string;
   createdAt: string;
+} | {
+  type: 'presence_update';
+  userId: string;
+  isOnline: boolean;
+} | {
+  type: 'presence_snapshot';
+  statuses: Array<{
+    userId: string;
+    isOnline: boolean;
+  }>;
+} | {
+  type: 'typing';
+  fromUserId: string;
+  toUserId: string;
+  isTyping: boolean;
 };
 
 const userConnections = new Map<string, Set<WebSocket>>();
+const presenceSubscribersByTarget = new Map<string, Set<string>>();
+const presenceTargetsBySubscriber = new Map<string, Set<string>>();
 
 const parseCookieValue = (cookieHeader: string | undefined, key: string): string | null => {
   if (!cookieHeader) {
@@ -75,6 +99,65 @@ const removeUserConnection = (userId: string, socket: WebSocket): void => {
   }
 };
 
+const isUserOnline = (userId: string): boolean => {
+  return Boolean(userConnections.get(userId)?.size);
+};
+
+const removeAllPresenceSubscriptionsForSubscriber = (subscriberUserId: string): void => {
+  const targets = presenceTargetsBySubscriber.get(subscriberUserId);
+
+  if (!targets?.size) {
+    return;
+  }
+
+  targets.forEach((targetUserId) => {
+    const subscribers = presenceSubscribersByTarget.get(targetUserId);
+
+    if (!subscribers) {
+      return;
+    }
+
+    subscribers.delete(subscriberUserId);
+
+    if (!subscribers.size) {
+      presenceSubscribersByTarget.delete(targetUserId);
+    }
+  });
+
+  presenceTargetsBySubscriber.delete(subscriberUserId);
+};
+
+const setPresenceSubscriptions = (subscriberUserId: string, userIds: string[]): void => {
+  removeAllPresenceSubscriptionsForSubscriber(subscriberUserId);
+
+  const uniqueTargetUserIds = Array.from(
+    new Set(
+      userIds
+        .filter((value) => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0 && value !== subscriberUserId)
+        .slice(0, 100)
+    )
+  );
+
+  if (!uniqueTargetUserIds.length) {
+    return;
+  }
+
+  presenceTargetsBySubscriber.set(subscriberUserId, new Set(uniqueTargetUserIds));
+
+  uniqueTargetUserIds.forEach((targetUserId) => {
+    const subscribers = presenceSubscribersByTarget.get(targetUserId);
+
+    if (subscribers) {
+      subscribers.add(subscriberUserId);
+      return;
+    }
+
+    presenceSubscribersByTarget.set(targetUserId, new Set([subscriberUserId]));
+  });
+};
+
 const broadcastToUser = (userId: string, payload: WsOutboundMessage): void => {
   const sockets = userConnections.get(userId);
 
@@ -91,6 +174,40 @@ const broadcastToUser = (userId: string, payload: WsOutboundMessage): void => {
   });
 };
 
+const sendPresenceSnapshot = (subscriberUserId: string): void => {
+  const targets = presenceTargetsBySubscriber.get(subscriberUserId);
+
+  if (!targets?.size) {
+    return;
+  }
+
+  const statuses = Array.from(targets).map((targetUserId) => ({
+    userId: targetUserId,
+    isOnline: isUserOnline(targetUserId)
+  }));
+
+  broadcastToUser(subscriberUserId, {
+    type: 'presence_snapshot',
+    statuses
+  });
+};
+
+const broadcastPresenceUpdate = (targetUserId: string, isOnline: boolean): void => {
+  const subscribers = presenceSubscribersByTarget.get(targetUserId);
+
+  if (!subscribers?.size) {
+    return;
+  }
+
+  subscribers.forEach((subscriberUserId) => {
+    broadcastToUser(subscriberUserId, {
+      type: 'presence_update',
+      userId: targetUserId,
+      isOnline
+    });
+  });
+};
+
 export const setupWebSocketServer = (server: import('http').Server): WebSocketServer => {
   const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -103,11 +220,39 @@ export const setupWebSocketServer = (server: import('http').Server): WebSocketSe
       }
 
       const payload = verifyAccessToken(token);
+      const wasOnline = isUserOnline(payload.userId);
       addUserConnection(payload.userId, socket);
+
+      if (!wasOnline) {
+        broadcastPresenceUpdate(payload.userId, true);
+      }
 
       socket.on('message', async (rawData) => {
         try {
           const data = JSON.parse(rawData.toString()) as WsInboundMessage;
+
+          if (data.type === 'presence_subscribe') {
+            setPresenceSubscriptions(payload.userId, Array.isArray(data.userIds) ? data.userIds : []);
+            sendPresenceSnapshot(payload.userId);
+            return;
+          }
+
+          if (data.type === 'typing') {
+            if (typeof data.toUserId !== 'string' || typeof data.isTyping !== 'boolean') {
+              return;
+            }
+
+            const outboundTypingPayload: WsOutboundMessage = {
+              type: 'typing',
+              fromUserId: payload.userId,
+              toUserId: data.toUserId,
+              isTyping: data.isTyping
+            };
+
+            broadcastToUser(payload.userId, outboundTypingPayload);
+            broadcastToUser(data.toUserId, outboundTypingPayload);
+            return;
+          }
 
           if (data.type !== 'private_message') {
             return;
@@ -132,7 +277,15 @@ export const setupWebSocketServer = (server: import('http').Server): WebSocketSe
       });
 
       socket.on('close', () => {
+        const wasOnline = isUserOnline(payload.userId);
         removeUserConnection(payload.userId, socket);
+
+        const isStillOnline = isUserOnline(payload.userId);
+
+        if (wasOnline && !isStillOnline) {
+          removeAllPresenceSubscriptionsForSubscriber(payload.userId);
+          broadcastPresenceUpdate(payload.userId, false);
+        }
       });
     } catch (_error) {
       socket.close(1008, 'Unauthorized');

@@ -54,20 +54,22 @@ const matchesQuery = (value: string, query: string): boolean => {
 export const searchCourseTypes = async (query: string): Promise<string[]> => {
   const trimmedQuery = query.trim();
 
-  if (trimmedQuery.length < 2) {
+  if (trimmedQuery.length < 1) {
     return [];
   }
 
-  try {
-    const response = await fetch(
-      `https://api.openalex.org/concepts?search=${encodeURIComponent(trimmedQuery)}&per-page=30`
-    );
+  const fallbackTypes = FALLBACK_COURSE_TYPES.filter((courseType) => matchesQuery(courseType, trimmedQuery)).slice(0, 20);
 
-    if (!response.ok) {
-      throw new Error('Unable to fetch course types from provider');
+  try {
+    const responseResult = await Promise.allSettled([
+      fetch(`https://api.openalex.org/concepts?search=${encodeURIComponent(trimmedQuery)}&per-page=30`)
+    ]);
+
+    if (responseResult[0]?.status !== 'fulfilled' || !responseResult[0].value.ok) {
+      return fallbackTypes;
     }
 
-    const data = (await response.json()) as OpenAlexResponse;
+    const data = (await responseResult[0].value.json()) as OpenAlexResponse;
     const uniqueCourseTypes = new Set<string>();
 
     for (const concept of data.results ?? []) {
@@ -89,5 +91,5 @@ export const searchCourseTypes = async (query: string): Promise<string[]> => {
     // fallback below
   }
 
-  return FALLBACK_COURSE_TYPES.filter((courseType) => matchesQuery(courseType, trimmedQuery)).slice(0, 20);
+  return fallbackTypes;
 };

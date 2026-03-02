@@ -1,4 +1,4 @@
-import type { Application, User } from '@prisma/client';
+import { Prisma, type Application, type User } from '@prisma/client';
 import type { UploadApiResponse } from 'cloudinary';
 import { APPLICATION_STATUS, type ApplicationStatus } from '../../../../shared/applicationStatus';
 import { cloudinary } from '../../config/cloudinary';
@@ -6,7 +6,9 @@ import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/app-error';
 import { hashPassword } from '../../utils/hash';
 import { signAccessToken, signRefreshToken } from '../../utils/jwt';
-import type { ApplicationDocumentType, SubmitApplicationDto } from './application.validation';
+import { sendEmailVerification } from '../auth/auth.service';
+import { addConversationMessage, getAssignedAdminForUser } from '../chat/chat.service';
+import type { ApplicationDocumentType, ReapplyApplicationDto, SubmitApplicationDto } from './application.validation';
 
 type SanitizedUser = Omit<User, 'password'>;
 type ApplicationResult = {
@@ -31,9 +33,6 @@ const documentFieldMap: Record<ApplicationDocumentType, keyof Application> = {
   referenceLetters: 'referenceLettersUrl',
   portfolio: 'portfolioUrl',
   applicationFeeReceipt: 'applicationFeeReceiptUrl',
-  offerLetter: 'offerLetterUrl',
-  casLetter: 'casLetterUrl',
-  visaDecisionLetter: 'visaDecisionLetterUrl',
   proofOfFunds: 'proofOfFundsUrl'
 };
 
@@ -70,6 +69,34 @@ const parseApplicationStatus = (value: string): ApplicationStatus => {
   throw new AppError(500, 'Invalid application status in database');
 };
 
+const buildCountrySpecificOfferFields = (universityCountry?: string) => {
+  const normalizedCountry = universityCountry?.trim().toLowerCase();
+
+  if (normalizedCountry === 'united kingdom') {
+    return { ukCasStatus: 'PENDING' };
+  }
+
+  if (normalizedCountry === 'australia') {
+    return { australiaCoeStatus: 'PENDING' };
+  }
+
+  if (normalizedCountry === 'united states') {
+    return { usaI20Status: 'PENDING' };
+  }
+
+  if (normalizedCountry === 'canada') {
+    return { canadaLoaStatus: 'PENDING' };
+  }
+
+  return {};
+};
+
+const buildWelcomeMessage = (userFullName: string, adminFullName: string, applicationType: SubmitApplicationDto['applicationType']) => {
+  const processLabel = applicationType === 'study_scholarship' ? 'admission process' : 'work application process';
+
+  return `Welcome onboard, ${userFullName}. Hi, ${userFullName}, I am ${adminFullName}, and I have been assigned to assist you throughout your ${processLabel}. Please feel free to reach out here anytime if you need guidance.`;
+};
+
 export const submitApplication = async (payload: SubmitApplicationDto): Promise<ApplicationResult> => {
   const existing = await prisma.user.findUnique({ where: { email: payload.email } });
   if (existing) {
@@ -83,15 +110,6 @@ export const submitApplication = async (payload: SubmitApplicationDto): Promise<
       data: {
         fullName: payload.fullName,
         email: payload.email,
-        password: hashedPassword,
-        role: 'USER'
-      }
-    });
-
-    const createdApplication = await tx.application.create({
-      data: {
-        userId: createdUser.id,
-        applicationType: payload.applicationType,
         dateOfBirth: payload.dateOfBirth,
         gender: payload.gender,
         countryCode: payload.countryCode,
@@ -102,15 +120,25 @@ export const submitApplication = async (payload: SubmitApplicationDto): Promise<
         residentialAddress: payload.residentialAddress,
         passportNumber: payload.passportNumber,
         passportExpiryDate: payload.passportExpiryDate,
+        password: hashedPassword,
+        role: 'USER'
+      }
+    });
+
+    const createdApplication = await tx.application.create({
+      data: {
+        userId: createdUser.id,
+        applicationType: payload.applicationType,
         skillOrProfession: payload.skillOrProfession,
+        workCountry: payload.workCountry,
         universityName: payload.universityName,
         universityCountry: payload.universityCountry,
         courseName: payload.courseName,
         degreeType: payload.degreeType,
         studyMode: payload.studyMode,
         intake: payload.intake,
-        applicationDate: payload.applicationDate,
-        applicationStatus: APPLICATION_STATUS.SUBMITTED_TO_UNIVERSITY
+        ...buildCountrySpecificOfferFields(payload.universityCountry),
+        applicationStatus: APPLICATION_STATUS.APPLICATION_PENDING
       }
     });
 
@@ -122,6 +150,25 @@ export const submitApplication = async (payload: SubmitApplicationDto): Promise<
 
   const jwtPayload = { userId: user.id, email: user.email, role: user.role };
 
+  const assignedAdmin = await getAssignedAdminForUser();
+
+  if (assignedAdmin) {
+    try {
+      await addConversationMessage(
+        assignedAdmin.id,
+        user.id,
+        buildWelcomeMessage(user.fullName, assignedAdmin.fullName, payload.applicationType)
+      );
+    } catch (_error) {
+    }
+  }
+
+  try {
+    await sendEmailVerification(user.id);
+  } catch (error) {
+    console.error('Failed to send verification email after application submission', error);
+  }
+
   return {
     user: sanitizeUser(user),
     application,
@@ -130,10 +177,104 @@ export const submitApplication = async (payload: SubmitApplicationDto): Promise<
   };
 };
 
+export const reapplyApplication = async (
+  userId: string,
+  payload: ReapplyApplicationDto
+): Promise<Application> => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      role: true,
+      dateOfBirth: true,
+      gender: true,
+      countryCode: true,
+      phoneNumber: true,
+      nationality: true,
+      countryOfResidence: true,
+      stateOrProvince: true,
+      residentialAddress: true,
+      passportNumber: true,
+      passportExpiryDate: true
+    }
+  });
+
+  if (!user || user.role !== 'USER') {
+    throw new AppError(404, 'User not found');
+  }
+
+  const requiredUserFields: Array<
+    keyof Pick<
+      typeof user,
+      | 'dateOfBirth'
+      | 'gender'
+      | 'countryCode'
+      | 'phoneNumber'
+      | 'nationality'
+      | 'countryOfResidence'
+      | 'stateOrProvince'
+      | 'residentialAddress'
+      | 'passportNumber'
+      | 'passportExpiryDate'
+    >
+  > = [
+    'dateOfBirth',
+    'gender',
+    'countryCode',
+    'phoneNumber',
+    'nationality',
+    'countryOfResidence',
+    'stateOrProvince',
+    'residentialAddress',
+    'passportNumber',
+    'passportExpiryDate'
+  ];
+
+  const hasIncompleteProfile = requiredUserFields.some((field) => {
+    const value = user[field];
+    return typeof value !== 'string' || value.trim().length === 0;
+  });
+
+  if (hasIncompleteProfile) {
+    throw new AppError(400, 'Personal profile is incomplete. Please update your profile before reapplying.');
+  }
+
+  const applicationData = {
+    applicationType: payload.applicationType,
+    skillOrProfession: payload.applicationType === 'work_employment' ? payload.skillOrProfession : null,
+    workCountry: payload.applicationType === 'work_employment' ? payload.workCountry : null,
+    universityName: payload.applicationType === 'study_scholarship' ? payload.universityName : null,
+    universityCountry: payload.applicationType === 'study_scholarship' ? payload.universityCountry : null,
+    courseName: payload.applicationType === 'study_scholarship' ? payload.courseName : null,
+    degreeType: payload.applicationType === 'study_scholarship' ? payload.degreeType : null,
+    studyMode: payload.applicationType === 'study_scholarship' ? payload.studyMode : null,
+    intake: payload.applicationType === 'study_scholarship' ? payload.intake : null,
+    ...buildCountrySpecificOfferFields(payload.applicationType === 'study_scholarship' ? payload.universityCountry : undefined),
+    applicationStatus: APPLICATION_STATUS.APPLICATION_PENDING
+  };
+
+  try {
+    return await prisma.application.create({
+      data: {
+        userId,
+        ...applicationData
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      throw new AppError(409, 'Reapply is blocked by a legacy unique application constraint. Apply latest migrations.');
+    }
+
+    throw error;
+  }
+};
+
 export type ApplicationStatusRecord = {
   id: string;
   userId: string;
+  applicationType: string;
   universityName: string | null;
+  universityCountry: string | null;
   applicationStatus: ApplicationStatus;
 };
 
@@ -149,6 +290,8 @@ export type TrackerViewedResponse = {
 
 export type AdminApplicationListItem = {
   id: string;
+  applicationType: string;
+  hasAdminViewed: boolean;
   universityName: string | null;
   courseName: string | null;
   skillOrProfession: string | null;
@@ -181,6 +324,8 @@ export const getAllApplicationsForAdmin = async (): Promise<AdminApplicationList
     },
     select: {
       id: true,
+      applicationType: true,
+      hasAdminViewed: true,
       universityName: true,
       courseName: true,
       skillOrProfession: true,
@@ -198,31 +343,40 @@ export const getAllApplicationsForAdmin = async (): Promise<AdminApplicationList
 };
 
 export const getApplicationDetailsForAdmin = async (applicationId: string): Promise<AdminApplicationDetails | null> => {
-  const application = await prisma.application.findUnique({
+  const applicationExists = await prisma.application.findUnique({
     where: { id: applicationId },
+    select: { id: true }
+  });
+
+  if (!applicationExists) {
+    return null;
+  }
+
+  const application = await prisma.application.update({
+    where: { id: applicationId },
+    data: {
+      hasAdminViewed: true
+    },
     select: {
       id: true,
       applicationType: true,
       applicationStatus: true,
       status: true,
-      countryOfResidence: true,
       internationalPassportUrl: true,
       user: {
         select: {
           id: true,
           fullName: true,
-          email: true
+          email: true,
+          countryOfResidence: true
         }
       }
     }
   });
 
-  if (!application) {
-    return null;
-  }
-
   return {
     ...application,
+    countryOfResidence: application.user.countryOfResidence ?? 'N/A',
     applicationStatus: parseApplicationStatus(application.applicationStatus)
   };
 };
@@ -233,7 +387,9 @@ export const getApplicationStatusById = async (applicationId: string): Promise<A
     select: {
       id: true,
       userId: true,
+      applicationType: true,
       universityName: true,
+      universityCountry: true,
       applicationStatus: true
     }
   });
@@ -245,7 +401,9 @@ export const getApplicationStatusById = async (applicationId: string): Promise<A
   return {
     id: application.id,
     userId: application.userId,
+    applicationType: application.applicationType,
     universityName: application.universityName,
+    universityCountry: application.universityCountry,
     applicationStatus: parseApplicationStatus(application.applicationStatus)
   };
 };
@@ -313,7 +471,8 @@ export const markApplicationTrackerViewed = async (
     where: { id: applicationId },
     select: {
       id: true,
-      userId: true
+      userId: true,
+      applicationType: true
     }
   });
 
@@ -323,6 +482,10 @@ export const markApplicationTrackerViewed = async (
 
   if (application.userId !== userId) {
     throw new AppError(403, 'Forbidden');
+  }
+
+  if (application.applicationType !== 'study_scholarship') {
+    throw new AppError(400, 'Tracker is available for study applications only');
   }
 
   const updatedApplication = await prisma.application.update({
@@ -340,4 +503,43 @@ export const markApplicationTrackerViewed = async (
     id: updatedApplication.id,
     hasViewedTracker: updatedApplication.hasViewedTracker
   };
+};
+
+export const deleteApplicationById = async (applicationId: string, userId: string): Promise<void> => {
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: {
+      id: true,
+      userId: true
+    }
+  });
+
+  if (!application) {
+    throw new AppError(404, 'Application not found');
+  }
+
+  if (application.userId !== userId) {
+    throw new AppError(403, 'Forbidden');
+  }
+
+  await prisma.application.delete({
+    where: { id: applicationId }
+  });
+};
+
+export const deleteApplicationByIdForAdmin = async (applicationId: string): Promise<void> => {
+  const application = await prisma.application.findUnique({
+    where: { id: applicationId },
+    select: {
+      id: true
+    }
+  });
+
+  if (!application) {
+    throw new AppError(404, 'Application not found');
+  }
+
+  await prisma.application.delete({
+    where: { id: applicationId }
+  });
 };

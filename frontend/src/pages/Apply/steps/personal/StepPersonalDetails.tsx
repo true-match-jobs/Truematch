@@ -52,7 +52,6 @@ export const StepPersonalDetails = ({ onSubmit, loading, initialValues, onBack }
         label="Full Name"
         placeholder="Ada Okafor"
         error={errors.fullName?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('fullName')}
       />
       <Input
@@ -60,7 +59,6 @@ export const StepPersonalDetails = ({ onSubmit, loading, initialValues, onBack }
         type="date"
         label="Date of Birth"
         error={errors.dateOfBirth?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('dateOfBirth')}
       />
       <Controller
@@ -86,7 +84,6 @@ export const StepPersonalDetails = ({ onSubmit, loading, initialValues, onBack }
           placeholder="+234"
           maxLength={6}
           error={errors.countryCode?.message}
-          className="glass-border border-white/10 focus:border-white/20"
           {...register('countryCode')}
         />
         <Input
@@ -96,7 +93,6 @@ export const StepPersonalDetails = ({ onSubmit, loading, initialValues, onBack }
           placeholder="8012345678"
           maxLength={12}
           error={errors.phoneNumber?.message}
-          className="glass-border border-white/10 focus:border-white/20"
           {...register('phoneNumber')}
         />
       </div>

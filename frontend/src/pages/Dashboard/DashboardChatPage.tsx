@@ -3,17 +3,27 @@ import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { PdfPreview } from '../../components/chat/PdfPreview';
-import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import {
   chatService,
   decodeAttachmentMessageContent,
   encodeAttachmentMessageContent,
+  type ChatAttachment,
   type ChatMessage,
   type ChatUser
 } from '../../services/chat.service';
 import { useChatNotificationStore } from '../../store/chat-notification.store';
+import { buildInitialAvatarUrl } from '../../utils/avatar';
 
 const MAX_COMPOSER_HEIGHT = 112;
+const CHAT_PAGE_CACHE_TTL_MS = 45_000;
+
+type ConversationCacheEntry = {
+  peer: ChatUser;
+  messages: ChatMessage[];
+  cachedAt: number;
+};
+
+const conversationCache = new Map<string, ConversationCacheEntry>();
 
 type PendingComposerAttachment = {
   file: File;
@@ -33,11 +43,32 @@ export const DashboardChatPage = () => {
   const [isLoadingConversation, setIsLoadingConversation] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSocketReady, setIsSocketReady] = useState(false);
+  const [downloadingMessageId, setDownloadingMessageId] = useState<string | null>(null);
+  const [isPeerTyping, setIsPeerTyping] = useState(false);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const typingIdleTimeoutRef = useRef<number | null>(null);
+  const typingHeartbeatIntervalRef = useRef<number | null>(null);
+  const peerTypingTimeoutRef = useRef<number | null>(null);
+  const hasEmittedTypingRef = useRef(false);
   const clearAdminUnreadForUser = useChatNotificationStore((state) => state.clearAdminUnreadForUser);
+  const presenceByUserId = useChatNotificationStore((state) => state.presenceByUserId);
+  const subscribeToPresence = useChatNotificationStore((state) => state.subscribeToPresence);
+
+  const isPeerOnline = peer?.id ? Boolean(presenceByUserId[peer.id]) : false;
+  const generatedPeerAvatarUrl = buildInitialAvatarUrl({
+    fullName: peer?.fullName,
+    email: peer?.email,
+    id: peer?.id,
+    fallback: 'Chat',
+    size: 36
+  });
+  const peerAvatarUrl =
+    peer?.role === 'ADMIN' && peer.profilePhotoUrl
+      ? peer.profilePhotoUrl
+      : generatedPeerAvatarUrl;
 
   const requestedPeerUserId = useMemo(() => {
     if (user?.role === 'ADMIN') {
@@ -46,6 +77,11 @@ export const DashboardChatPage = () => {
 
     return undefined;
   }, [conversationId, user?.role]);
+
+  const conversationCacheKey = useMemo(
+    () => (requestedPeerUserId && requestedPeerUserId.trim().length > 0 ? requestedPeerUserId : '__assigned_admin__'),
+    [requestedPeerUserId]
+  );
 
   const formatTime = (value: string) => {
     const date = new Date(value);
@@ -58,6 +94,55 @@ export const DashboardChatPage = () => {
       hour: 'numeric',
       minute: '2-digit'
     }).format(date);
+  };
+
+  const clearTypingIdleTimeout = () => {
+    if (typingIdleTimeoutRef.current !== null) {
+      window.clearTimeout(typingIdleTimeoutRef.current);
+      typingIdleTimeoutRef.current = null;
+    }
+  };
+
+  const clearTypingHeartbeat = () => {
+    if (typingHeartbeatIntervalRef.current !== null) {
+      window.clearInterval(typingHeartbeatIntervalRef.current);
+      typingHeartbeatIntervalRef.current = null;
+    }
+  };
+
+  const clearPeerTypingTimeout = () => {
+    if (peerTypingTimeoutRef.current !== null) {
+      window.clearTimeout(peerTypingTimeoutRef.current);
+      peerTypingTimeoutRef.current = null;
+    }
+  };
+
+  const emitTyping = (isTyping: boolean) => {
+    const activeSocket = socketRef.current;
+
+    if (!peer || !activeSocket || activeSocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    activeSocket.send(
+      JSON.stringify({
+        type: 'typing',
+        toUserId: peer.id,
+        isTyping
+      })
+    );
+  };
+
+  const stopTyping = () => {
+    clearTypingIdleTimeout();
+    clearTypingHeartbeat();
+
+    if (!hasEmittedTypingRef.current) {
+      return;
+    }
+
+    emitTyping(false);
+    hasEmittedTypingRef.current = false;
   };
 
   useLayoutEffect(() => {
@@ -80,6 +165,26 @@ export const DashboardChatPage = () => {
         return;
       }
 
+      const cachedConversation = conversationCache.get(conversationCacheKey);
+      const isCacheFresh =
+        Boolean(cachedConversation) &&
+        Date.now() - (cachedConversation?.cachedAt ?? 0) < CHAT_PAGE_CACHE_TTL_MS;
+
+      if (cachedConversation && isCacheFresh) {
+        setPeer(cachedConversation.peer);
+        setMessages(cachedConversation.messages);
+        setIsLoadingConversation(false);
+        setErrorMessage(null);
+
+        void chatService.markConversationRead(cachedConversation.peer.id);
+
+        if (user.role === 'ADMIN') {
+          clearAdminUnreadForUser(cachedConversation.peer.id);
+        }
+
+        return;
+      }
+
       setIsLoadingConversation(true);
       setErrorMessage(null);
 
@@ -94,6 +199,11 @@ export const DashboardChatPage = () => {
 
         setPeer(resolvedPeer);
         setMessages(history);
+        conversationCache.set(conversationCacheKey, {
+          peer: resolvedPeer,
+          messages: history,
+          cachedAt: Date.now()
+        });
 
         if (user.role === 'ADMIN') {
           clearAdminUnreadForUser(resolvedPeer.id);
@@ -121,6 +231,34 @@ export const DashboardChatPage = () => {
   }, [clearAdminUnreadForUser, requestedPeerUserId, user]);
 
   useEffect(() => {
+    if (!peer) {
+      return;
+    }
+
+    conversationCache.set(conversationCacheKey, {
+      peer,
+      messages,
+      cachedAt: Date.now()
+    });
+  }, [conversationCacheKey, messages, peer]);
+
+  useEffect(() => {
+    const peerUserId = peer?.id;
+
+    if (!peerUserId) {
+      subscribeToPresence([]);
+      return;
+    }
+
+    subscribeToPresence([peerUserId]);
+  }, [peer?.id, subscribeToPresence]);
+
+  useEffect(() => {
+    setIsPeerTyping(false);
+    clearPeerTypingTimeout();
+  }, [peer?.id]);
+
+  useEffect(() => {
     if (!user || !peer) {
       return;
     }
@@ -142,7 +280,39 @@ export const DashboardChatPage = () => {
 
     socket.onmessage = (event) => {
       try {
-        const payload = JSON.parse(event.data as string) as ChatMessage & { type?: string };
+        const payload = JSON.parse(event.data as string) as
+          | (ChatMessage & { type?: string })
+          | { type: 'typing'; fromUserId: string; toUserId: string; isTyping: boolean };
+
+        if (
+          payload.type === 'typing' &&
+          'fromUserId' in payload &&
+          'toUserId' in payload &&
+          'isTyping' in payload &&
+          typeof payload.fromUserId === 'string' &&
+          typeof payload.toUserId === 'string' &&
+          typeof payload.isTyping === 'boolean'
+        ) {
+          const participants = [payload.fromUserId, payload.toUserId];
+
+          if (!participants.includes(user.id) || !participants.includes(peer.id) || payload.fromUserId !== peer.id) {
+            return;
+          }
+
+          if (!payload.isTyping) {
+            setIsPeerTyping(false);
+            clearPeerTypingTimeout();
+            return;
+          }
+
+          setIsPeerTyping(true);
+          clearPeerTypingTimeout();
+          peerTypingTimeoutRef.current = window.setTimeout(() => {
+            setIsPeerTyping(false);
+            peerTypingTimeoutRef.current = null;
+          }, 3000);
+          return;
+        }
 
         if (payload.type !== 'private_message') {
           return;
@@ -161,15 +331,23 @@ export const DashboardChatPage = () => {
 
           return [...current, payload];
         });
+
+        if (payload.fromUserId === peer.id) {
+          setIsPeerTyping(false);
+          clearPeerTypingTimeout();
+        }
       } catch (_error) {
         return;
       }
     };
 
     return () => {
+      stopTyping();
       socket.close();
       socketRef.current = null;
       setIsSocketReady(false);
+      setIsPeerTyping(false);
+      clearPeerTypingTimeout();
     };
   }, [peer, user]);
 
@@ -178,7 +356,37 @@ export const DashboardChatPage = () => {
   }, [messages]);
 
   useEffect(() => {
+    const trimmedDraft = draft.trim();
+
+    if (!peer || !isSocketReady || !trimmedDraft) {
+      stopTyping();
+      return;
+    }
+
+    if (!hasEmittedTypingRef.current) {
+      emitTyping(true);
+      hasEmittedTypingRef.current = true;
+
+      clearTypingHeartbeat();
+      typingHeartbeatIntervalRef.current = window.setInterval(() => {
+        if (!hasEmittedTypingRef.current) {
+          return;
+        }
+
+        emitTyping(true);
+      }, 2500);
+    }
+
+    clearTypingIdleTimeout();
+    typingIdleTimeoutRef.current = window.setTimeout(() => {
+      stopTyping();
+    }, 1200);
+  }, [draft, isSocketReady, peer]);
+
+  useEffect(() => {
     return () => {
+      stopTyping();
+      clearPeerTypingTimeout();
       if (pendingAttachment?.localUrl) {
         URL.revokeObjectURL(pendingAttachment.localUrl);
       }
@@ -223,6 +431,7 @@ export const DashboardChatPage = () => {
       })
     );
 
+    stopTyping();
     setDraft('');
     if (pendingAttachment?.localUrl) {
       URL.revokeObjectURL(pendingAttachment.localUrl);
@@ -260,24 +469,64 @@ export const DashboardChatPage = () => {
     });
   };
 
+  const handlePdfDownload = async (messageId: string, attachment: ChatAttachment) => {
+    try {
+      setErrorMessage(null);
+      setDownloadingMessageId(messageId);
+      await chatService.downloadAttachment(attachment);
+    } catch (_error) {
+      setErrorMessage('Unable to download attachment right now. Please try again.');
+    } finally {
+      setDownloadingMessageId(null);
+    }
+  };
+
   return (
     <section className="flex h-full min-h-0 flex-col">
       <header className="border-b border-white/10">
-        <div className="px-3 py-3">
-          <h2 className="flex items-center gap-2.5 text-base font-semibold text-zinc-100">
-            <img
-              src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${peer?.id ?? 'chat-peer'}`}
-              alt={`${peer?.fullName ?? 'Chat partner'} avatar`}
-              className="h-8 w-8 rounded-full bg-dark-card"
-            />
-            <span>{peer?.fullName ?? (isLoadingConversation ? 'Loading...' : 'Chat')}</span>
-          </h2>
+        <div className="px-3 py-2">
+          {isLoadingConversation ? (
+            <div className="flex items-center gap-2.5" aria-hidden>
+              <div className="h-8 w-8 animate-pulse rounded-full bg-white/10" />
+              <div className="space-y-1">
+                <div className="h-3.5 w-24 animate-pulse rounded bg-white/10" />
+                <div className="h-2.5 w-16 animate-pulse rounded bg-white/10" />
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="relative">
+                <img
+                  src={peerAvatarUrl}
+                  alt={`${peer?.fullName ?? 'Chat partner'} avatar`}
+                  className="h-8 w-8 rounded-full bg-dark-card"
+                />
+                <span
+                  className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border border-dark-bg ${
+                    isPeerOnline ? 'bg-emerald-400' : 'bg-zinc-500'
+                  }`}
+                  aria-hidden
+                />
+              </div>
+              <div>
+                <h2 className="text-base font-semibold text-zinc-100">{peer?.fullName ?? 'Chat'}</h2>
+                {isPeerTyping ? (
+                  <div className="mt-0.5 flex items-center gap-1" role="status" aria-live="polite" aria-label="Typing indicator">
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.9s' }} />
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '0.9s' }} />
+                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '0.9s' }} />
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-400">{peer ? (isPeerOnline ? 'Online' : 'Offline') : 'Unavailable'}</p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-3 pt-3 pb-6">
         <div className="flex min-h-full flex-col justify-end gap-4">
-          {isLoadingConversation ? <LoadingSpinner className="py-10" /> : null}
           {!isLoadingConversation && errorMessage ? <p className="text-sm text-rose-400">{errorMessage}</p> : null}
 
           {!isLoadingConversation && !errorMessage && !messages.length ? (
@@ -287,9 +536,6 @@ export const DashboardChatPage = () => {
           {messages.map((message) => {
             const isMine = message.fromUserId === user?.id;
             const decodedAttachment = decodeAttachmentMessageContent(message.content);
-            const attachmentDownloadUrl = decodedAttachment
-              ? decodedAttachment.attachment.downloadUrl || decodedAttachment.attachment.url
-              : null;
             const messageText = decodedAttachment?.text ?? (!decodedAttachment ? message.content : '');
 
             if (isMine) {
@@ -311,16 +557,19 @@ export const DashboardChatPage = () => {
                             }
                           />
                         ) : (
-                          <a
-                            href={attachmentDownloadUrl || decodedAttachment.attachment.url}
-                            download={decodedAttachment.attachment.name}
-                            className="block overflow-hidden rounded-lg border border-white/20 bg-white/10"
+                          <button
+                            type="button"
+                            onClick={() => void handlePdfDownload(message.id, decodedAttachment.attachment)}
+                            className="block w-full overflow-hidden rounded-lg border border-white/20 bg-white/10 text-left"
                           >
-                            <PdfPreview previewUrl={decodedAttachment.attachment.previewUrl} className="bg-zinc-900" />
+                            <PdfPreview
+                              attachment={decodedAttachment.attachment}
+                              className="bg-zinc-900"
+                            />
                             <p className="truncate px-2.5 py-2 text-xs font-medium text-white">
-                              {decodedAttachment.attachment.name}
+                              {downloadingMessageId === message.id ? 'Downloading PDF…' : decodedAttachment.attachment.name}
                             </p>
-                          </a>
+                          </button>
                         )}
                         {messageText ? <p>{messageText}</p> : null}
                       </div>
@@ -336,7 +585,7 @@ export const DashboardChatPage = () => {
             return (
               <div key={message.id} className="flex items-start gap-3">
                 <img
-                  src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${peer?.id ?? 'chat-peer'}`}
+                  src={peerAvatarUrl}
                   alt={`${peer?.fullName ?? 'Chat partner'} avatar`}
                   className="mt-6 h-9 w-9 flex-shrink-0 rounded-full bg-dark-card"
                 />
@@ -358,16 +607,19 @@ export const DashboardChatPage = () => {
                             }
                           />
                         ) : (
-                          <a
-                            href={attachmentDownloadUrl || decodedAttachment.attachment.url}
-                            download={decodedAttachment.attachment.name}
-                            className="block overflow-hidden rounded-lg border border-white/15 bg-black/20"
+                          <button
+                            type="button"
+                            onClick={() => void handlePdfDownload(message.id, decodedAttachment.attachment)}
+                            className="block w-full overflow-hidden rounded-lg border border-white/15 bg-black/20 text-left"
                           >
-                            <PdfPreview previewUrl={decodedAttachment.attachment.previewUrl} className="bg-zinc-900" />
+                            <PdfPreview
+                              attachment={decodedAttachment.attachment}
+                              className="bg-zinc-900"
+                            />
                             <p className="truncate px-2.5 py-2 text-xs font-medium text-zinc-100">
-                              {decodedAttachment.attachment.name}
+                              {downloadingMessageId === message.id ? 'Downloading PDF…' : decodedAttachment.attachment.name}
                             </p>
-                          </a>
+                          </button>
                         )}
                         {messageText ? <p>{messageText}</p> : null}
                       </div>
@@ -427,6 +679,7 @@ export const DashboardChatPage = () => {
               rows={1}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onBlur={() => stopTyping()}
               placeholder="Type your message..."
               className="min-h-11 w-full resize-none bg-transparent py-3 pl-12 pr-12 text-sm leading-6 text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
               style={{ maxHeight: `${MAX_COMPOSER_HEIGHT}px` }}

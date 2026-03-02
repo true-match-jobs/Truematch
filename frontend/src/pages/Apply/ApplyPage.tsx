@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { CaretRight } from '@phosphor-icons/react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Footer } from '../../components/layout/Footer';
+import { Navbar } from '../../components/layout/Navbar';
+import { Snackbar } from '../../components/ui/Snackbar';
 import { Stepper } from '../../components/ui/Stepper';
 import { useAuth } from '../../hooks/useAuth';
 import { applicationService } from '../../services/application.service';
@@ -97,30 +98,80 @@ const emptyPersonalInfo: PersonalDetailsValues = {
   passportExpiryDate: ''
 };
 
+const SUCCESS_TOAST_DURATION_MS = 4200;
+const SUCCESS_NAVIGATION_DELAY_MS = 2400;
+
 export const ApplyPage = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSuccessSnackbar, setShowSuccessSnackbar] = useState(false);
   const [personalInfo, setPersonalInfo] = useState<PersonalDetailsValues | null>(null);
   const [applicationType, setApplicationType] = useState<StepApplicationTypeValues | null>(null);
   const [skillProfession, setSkillProfession] = useState<StepSkillProfessionValues | null>(null);
   const [applicationSummary, setApplicationSummary] = useState<StepApplicationSummaryValues | null>(null);
   const [emailPassword, setEmailPassword] = useState<StepEmailPasswordValues | null>(null);
-  const { setSessionUser } = useAuth();
+  const { user, isAuthenticated, setSessionUser } = useAuth();
   const navigate = useNavigate();
+  const isReapplyFlow = isAuthenticated && user?.role === 'USER';
 
   const isWorkApplication = applicationType?.applicationType === 'work_employment';
   const isStudyApplication = applicationType?.applicationType === 'study_scholarship';
 
-  const flowSteps: FlowStep[] = [
-    baseSteps[0],
-    ...(isWorkApplication ? [skillStep] : []),
-    ...baseSteps.slice(1),
-    ...(isStudyApplication ? [applicationDetailsStep] : []),
-    emailPasswordStep
-  ];
+  const flowSteps: FlowStep[] = isReapplyFlow
+    ? [baseSteps[0], ...(isWorkApplication ? [skillStep] : []), ...(isStudyApplication ? [applicationDetailsStep] : [])]
+    : [
+        baseSteps[0],
+        ...(isWorkApplication ? [skillStep] : []),
+        ...baseSteps.slice(1),
+        ...(isStudyApplication ? [applicationDetailsStep] : []),
+        emailPasswordStep
+      ];
 
   const currentFlowStep = flowSteps[currentStep] ?? flowSteps[0];
+
+  useEffect(() => {
+    if (!showSuccessSnackbar) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowSuccessSnackbar(false);
+    }, SUCCESS_TOAST_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [showSuccessSnackbar]);
+
+  const submitReapplication = async (payload: {
+    applicationType: 'study_scholarship' | 'work_employment';
+    skillOrProfession?: string;
+    workCountry?: string;
+    universityName?: string;
+    universityCountry?: string;
+    courseName?: string;
+    degreeType?: string;
+    studyMode?: string;
+    intake?: string;
+  }) => {
+    setSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      await applicationService.reapply(payload);
+      setShowSuccessSnackbar(true);
+      await new Promise<void>((resolve) => {
+        window.setTimeout(() => resolve(), SUCCESS_NAVIGATION_DELAY_MS);
+      });
+      navigate('/dashboard');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      setErrorMessage(axiosError.response?.data?.message ?? 'Unable to reapply at the moment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleApplicationTypeSubmit = async (data: StepApplicationTypeValues) => {
     setSubmitting(true);
@@ -139,9 +190,24 @@ export const ApplyPage = () => {
   };
 
   const handleSkillProfessionSubmit = async (data: StepSkillProfessionValues) => {
+    setSkillProfession(data);
+
+    if (isReapplyFlow) {
+      if (!applicationType) {
+        setErrorMessage('Please select an application type before reapplying.');
+        return;
+      }
+
+      await submitReapplication({
+        applicationType: applicationType.applicationType,
+        skillOrProfession: data.skillOrProfession,
+        workCountry: data.workCountry
+      });
+      return;
+    }
+
     setSubmitting(true);
     setErrorMessage(null);
-    setSkillProfession(data);
     setCurrentStep((prev) => prev + 1);
     setSubmitting(false);
   };
@@ -189,9 +255,28 @@ export const ApplyPage = () => {
   };
 
   const handleApplicationSummarySubmit = async (data: StepApplicationSummaryValues) => {
+    setApplicationSummary(data);
+
+    if (isReapplyFlow) {
+      if (!applicationType) {
+        setErrorMessage('Please select an application type before reapplying.');
+        return;
+      }
+
+      await submitReapplication({
+        applicationType: applicationType.applicationType,
+        universityName: data.universityName,
+        universityCountry: data.universityCountry,
+        courseName: data.courseName,
+        degreeType: data.degreeType,
+        studyMode: data.studyMode,
+        intake: data.intake
+      });
+      return;
+    }
+
     setSubmitting(true);
     setErrorMessage(null);
-    setApplicationSummary(data);
 
     setCurrentStep((prev) => prev + 1);
 
@@ -223,18 +308,22 @@ export const ApplyPage = () => {
         passportNumber: personalInfo.passportNumber,
         passportExpiryDate: personalInfo.passportExpiryDate,
         skillOrProfession: skillProfession?.skillOrProfession,
+        workCountry: skillProfession?.workCountry,
         universityName: applicationSummary?.universityName,
         universityCountry: applicationSummary?.universityCountry,
         courseName: applicationSummary?.courseName,
         degreeType: applicationSummary?.degreeType,
         studyMode: applicationSummary?.studyMode,
         intake: applicationSummary?.intake,
-        applicationDate: applicationSummary?.applicationDate,
         email: data.email,
         password: data.password
       });
 
       setSessionUser(user);
+      setShowSuccessSnackbar(true);
+      await new Promise<void>((resolve) => {
+        window.setTimeout(() => resolve(), SUCCESS_NAVIGATION_DELAY_MS);
+      });
       navigate('/dashboard');
     } catch (error) {
       const axiosError = error as AxiosError<{ message?: string }>;
@@ -246,24 +335,12 @@ export const ApplyPage = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-dark-bg">
-      <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-        <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-          <li>
-            <Link
-              to="/"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Home
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li aria-current="page" className="font-medium text-zinc-100">
-            Apply
-          </li>
-        </ol>
-      </nav>
+      <Navbar />
+      <Snackbar
+        message={isReapplyFlow ? 'Application reapplied successfully' : 'Application submitted successfully'}
+        visible={showSuccessSnackbar}
+        position="bottom-center"
+      />
       <main className="mx-auto flex flex-1 w-full max-w-xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         {currentStep === 0 ? (
           <div className="mb-8 w-full text-left sm:mb-10">
@@ -276,7 +353,7 @@ export const ApplyPage = () => {
         ) : null}
 
         <div className="flex flex-1 items-center">
-          <div className="glass-border w-full space-y-8 rounded-2xl bg-transparent p-6 sm:p-10">
+          <div className="w-full space-y-8 rounded-2xl border border-white/40 bg-transparent p-6 sm:p-10">
           <div className="space-y-2 text-left">
             <h1 className="text-2xl font-bold text-white sm:text-3xl">{currentFlowStep.title}</h1>
             <p className="text-sm text-zinc-400">{currentFlowStep.description}</p>
@@ -290,6 +367,7 @@ export const ApplyPage = () => {
                 onSubmit={handleApplicationTypeSubmit}
                 loading={submitting}
                 initialValues={applicationType ?? undefined}
+                submitLabel="Continue"
               />
             ) : currentFlowStep.key === 'skillProfession' ? (
               <StepSkillProfession
@@ -297,6 +375,7 @@ export const ApplyPage = () => {
                 onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
                 loading={submitting}
                 initialValues={skillProfession ?? undefined}
+                submitLabel={isReapplyFlow ? 'Reapply' : 'Continue'}
               />
             ) : currentFlowStep.key === 'personalDetails' ? (
               <StepPersonalDetails
@@ -325,6 +404,7 @@ export const ApplyPage = () => {
                 onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
                 loading={submitting}
                 initialValues={applicationSummary ?? undefined}
+                submitLabel={isReapplyFlow ? 'Reapply' : 'Continue'}
               />
             ) : (
               <StepEmailPassword

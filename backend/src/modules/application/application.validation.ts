@@ -15,13 +15,13 @@ export const submitApplicationSchema = z
     passportNumber: z.string().min(1, 'Passport number is required'),
     passportExpiryDate: z.string().min(1, 'Passport expiry date is required'),
     skillOrProfession: z.string().optional(),
+    workCountry: z.string().optional(),
     universityName: z.string().optional(),
     universityCountry: z.string().optional(),
     courseName: z.string().optional(),
     degreeType: z.string().optional(),
     studyMode: z.string().optional(),
     intake: z.string().optional(),
-    applicationDate: z.string().optional(),
     email: z.string().email('Invalid email address').toLowerCase(),
     password: z.string().min(8, 'Password must be at least 8 characters')
   })
@@ -34,6 +34,14 @@ export const submitApplicationSchema = z
       });
     }
 
+    if (data.applicationType === 'work_employment' && !data.workCountry?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['workCountry'],
+        message: 'Work country is required for work applications'
+      });
+    }
+
     if (data.applicationType === 'study_scholarship') {
       const studyFields: Array<keyof Pick<
         typeof data,
@@ -43,15 +51,13 @@ export const submitApplicationSchema = z
         | 'degreeType'
         | 'studyMode'
         | 'intake'
-        | 'applicationDate'
       >> = [
         'universityName',
         'universityCountry',
         'courseName',
         'degreeType',
         'studyMode',
-        'intake',
-        'applicationDate'
+        'intake'
       ];
 
       for (const field of studyFields) {
@@ -68,6 +74,67 @@ export const submitApplicationSchema = z
 
 export type SubmitApplicationDto = z.infer<typeof submitApplicationSchema>;
 
+export const reapplyApplicationSchema = z
+  .object({
+    applicationType: z.enum(['study_scholarship', 'work_employment']),
+    skillOrProfession: z.string().optional(),
+    workCountry: z.string().optional(),
+    universityName: z.string().optional(),
+    universityCountry: z.string().optional(),
+    courseName: z.string().optional(),
+    degreeType: z.string().optional(),
+    studyMode: z.string().optional(),
+    intake: z.string().optional()
+  })
+  .superRefine((data, ctx) => {
+    if (data.applicationType === 'work_employment' && !data.skillOrProfession?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['skillOrProfession'],
+        message: 'Skill or profession is required for work applications'
+      });
+    }
+
+    if (data.applicationType === 'work_employment' && !data.workCountry?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['workCountry'],
+        message: 'Work country is required for work applications'
+      });
+    }
+
+    if (data.applicationType === 'study_scholarship') {
+      const studyFields: Array<keyof Pick<
+        typeof data,
+        | 'universityName'
+        | 'universityCountry'
+        | 'courseName'
+        | 'degreeType'
+        | 'studyMode'
+        | 'intake'
+      >> = [
+        'universityName',
+        'universityCountry',
+        'courseName',
+        'degreeType',
+        'studyMode',
+        'intake'
+      ];
+
+      for (const field of studyFields) {
+        if (!data[field]?.trim()) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [field],
+            message: 'This field is required for study applications'
+          });
+        }
+      }
+    }
+  });
+
+export type ReapplyApplicationDto = z.infer<typeof reapplyApplicationSchema>;
+
 export const applicationDocumentTypeSchema = z.enum([
   'internationalPassport',
   'academicTranscripts',
@@ -78,9 +145,6 @@ export const applicationDocumentTypeSchema = z.enum([
   'referenceLetters',
   'portfolio',
   'applicationFeeReceipt',
-  'offerLetter',
-  'casLetter',
-  'visaDecisionLetter',
   'proofOfFunds'
 ]);
 

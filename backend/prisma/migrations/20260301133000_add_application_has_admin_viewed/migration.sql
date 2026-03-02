@@ -1,0 +1,2 @@
+ALTER TABLE "Application"
+ADD COLUMN "hasAdminViewed" BOOLEAN NOT NULL DEFAULT false;

@@ -4,6 +4,8 @@ import { api } from './api';
 
 export type AdminApplicationListItem = {
   id: string;
+  applicationType: 'study_scholarship' | 'work_employment';
+  hasAdminViewed: boolean;
   universityName: string | null;
   courseName: string | null;
   skillOrProfession: string | null;
@@ -43,15 +45,27 @@ export type SubmitApplicationPayload = {
   passportNumber: string;
   passportExpiryDate: string;
   skillOrProfession?: string;
+  workCountry?: string;
   universityName?: string;
   universityCountry?: string;
   courseName?: string;
   degreeType?: string;
   studyMode?: string;
   intake?: string;
-  applicationDate?: string;
   email: string;
   password: string;
+};
+
+export type ReapplyApplicationPayload = {
+  applicationType: 'study_scholarship' | 'work_employment';
+  skillOrProfession?: string;
+  workCountry?: string;
+  universityName?: string;
+  universityCountry?: string;
+  courseName?: string;
+  degreeType?: string;
+  studyMode?: string;
+  intake?: string;
 };
 
 type SubmitApplicationResponse = {
@@ -74,6 +88,7 @@ type UploadApplicationDocumentResponse = {
 type ApplicationTrackerResponse = {
   id: string;
   universityName: string | null;
+  universityCountry: string | null;
   applicationStatus: ApplicationStatus;
 };
 
@@ -94,6 +109,11 @@ export const applicationService = {
   async submit(payload: SubmitApplicationPayload): Promise<User> {
     const response = await api.post<SubmitApplicationResponse>('/applications', payload);
     return response.data.user;
+  },
+
+  async reapply(payload: ReapplyApplicationPayload): Promise<Application> {
+    const response = await api.post<UploadApplicationDocumentResponse>('/applications/reapply', payload);
+    return response.data.application;
   },
 
   async uploadDocument(applicationId: string, documentType: ApplicationDocumentType, file: File): Promise<Application> {
@@ -122,6 +142,10 @@ export const applicationService = {
     await api.patch(`/applications/${applicationId}/tracker-viewed`);
   },
 
+  async deleteById(applicationId: string): Promise<void> {
+    await api.delete(`/applications/${applicationId}`);
+  },
+
   async getAllForAdmin(): Promise<AdminApplicationListItem[]> {
     const response = await api.get<AdminApplicationsResponse>('/admin/applications');
     return response.data.applications;
@@ -138,5 +162,9 @@ export const applicationService = {
     });
 
     return response.data.applicationStatus;
+  },
+
+  async deleteByIdForAdmin(applicationId: string): Promise<void> {
+    await api.delete(`/admin/applications/${applicationId}`);
   }
 };

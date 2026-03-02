@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
-import { CaretRight, ChatCircle, SignOut, SquaresFour } from '@phosphor-icons/react';
+import { CaretRight, ChatCircle, SignOut, SquaresFour, UserCircle } from '@phosphor-icons/react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navbar } from '../../components/layout/Navbar';
 import { useAuth } from '../../hooks/useAuth';
 import { useChatNotificationStore } from '../../store/chat-notification.store';
 import { useViewportHeight } from '../../hooks/useViewportHeight';
@@ -48,43 +49,39 @@ export const AdminDashboardLayout = () => {
 
   return (
     <div className="flex flex-col overflow-hidden bg-dark-bg" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
-      <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-        <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-          <li>
-            <Link
-              to="/"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Home
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          {isChatRoute ? (
-            <>
-              <li>
-                <Link
-                  to="/admin/dashboard"
-                  className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-                >
-                  Admin Dashboard
-                </Link>
-              </li>
-              <li aria-hidden className="text-zinc-600">
-                <CaretRight size={10} weight="bold" />
-              </li>
-              <li aria-current="page" className="font-medium text-zinc-100">
-                Chat
-              </li>
-            </>
-          ) : (
-            <li aria-current="page" className="font-medium text-zinc-100">
-              Admin Dashboard
+      {isChatRoute ? (
+        <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
+          <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
+            <li>
+              <Link
+                to="/"
+                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
+              >
+                Home
+              </Link>
             </li>
-          )}
-        </ol>
-      </nav>
+            <li aria-hidden className="text-zinc-600">
+              <CaretRight size={10} weight="bold" />
+            </li>
+            <li>
+              <Link
+                to="/admin/dashboard"
+                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
+              >
+                Admin Dashboard
+              </Link>
+            </li>
+            <li aria-hidden className="text-zinc-600">
+              <CaretRight size={10} weight="bold" />
+            </li>
+            <li aria-current="page" className="font-medium text-zinc-100">
+              Chat
+            </li>
+          </ol>
+        </nav>
+      ) : (
+        <Navbar />
+      )}
 
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-16 flex-col items-center border-r-2 border-white/10 bg-dark-card py-4">
@@ -121,6 +118,20 @@ export const AdminDashboardLayout = () => {
                   {unreadAdminUserIds.length > 99 ? '99+' : unreadAdminUserIds.length}
                 </span>
               ) : null}
+            </NavLink>
+
+            <NavLink
+              to="/admin/dashboard/profile"
+              className={({ isActive }) =>
+                `group relative flex items-center justify-center rounded-lg border-l-2 p-3 transition-colors ${
+                  isActive
+                    ? 'border-brand-500 bg-white/5 text-white'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-200'
+                }`
+              }
+              aria-label="Admin profile"
+            >
+              <UserCircle size={28} weight="regular" />
             </NavLink>
           </nav>
 

@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { CaretRight, Question, X } from '@phosphor-icons/react';
-import { Link, useParams } from 'react-router-dom';
+import { Question, X } from '@phosphor-icons/react';
+import { useParams } from 'react-router-dom';
 import {
   APPLICATION_STATUS,
   type ApplicationStatus
 } from '../../../../shared/applicationStatus';
 import { ApplicationProgressModal } from '../../components/application/ApplicationProgressModal';
 import { Footer } from '../../components/layout/Footer';
+import { Navbar } from '../../components/layout/Navbar';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { applicationService } from '../../services/application.service';
 import type { Application, ApplicationDocumentType } from '../../types/user';
@@ -24,13 +25,12 @@ const APPLICATION_DETAILS = {
       degreeType: 'MSc',
       studyMode: 'Full-time',
       intake: 'September 2026',
-      applicationDate: '12 February 2026',
       currentApplicationStatus: 'Under review',
-      assignedAdmissionOfficer: 'Sarah Morgan',
+      assignedAdmissionOfficer: 'TBD',
       offerType: 'Conditional',
       offerDate: 'Pending',
-      casStatus: 'Not issued',
-      casNumber: 'N/A'
+      countrySpecificOfferDocumentLabel: 'CAS',
+      countrySpecificOfferDocumentValue: 'Pending'
     },
     documents: [
       { documentName: 'International Passport', documentUploaded: 'my_passport.pdf' },
@@ -41,10 +41,7 @@ const APPLICATION_DETAILS = {
       { documentName: 'CV', documentUploaded: 'my_cv.pdf' },
       { documentName: 'Reference Letter(s)', documentUploaded: 'my_reference_letter.pdf' },
       { documentName: 'Portfolio', documentUploaded: 'portfolio.pdf' },
-      { documentName: 'Application Fee Receipt', documentUploaded: 'application_fee_receipt.pdf' },
-      { documentName: 'Offer Letter', documentUploaded: 'offer_letter.pdf' },
-      { documentName: 'CAS Letter', documentUploaded: 'cas_letter.pdf' },
-      { documentName: 'Visa Decision Letter', documentUploaded: 'visa_decision_letter.pdf' }
+      { documentName: 'Application Fee Receipt', documentUploaded: 'application_fee_receipt.pdf' }
     ],
     financialInformation: [
       { documentName: 'Proof of Funds', documentUploaded: 'proof_of_funds.pdf' }
@@ -66,9 +63,6 @@ type DocumentFieldConfig = {
     | 'referenceLettersUrl'
     | 'portfolioUrl'
     | 'applicationFeeReceiptUrl'
-    | 'offerLetterUrl'
-    | 'casLetterUrl'
-    | 'visaDecisionLetterUrl'
     | 'proofOfFundsUrl'
   >;
 };
@@ -82,32 +76,12 @@ const DOCUMENT_FIELDS: DocumentFieldConfig[] = [
   { documentType: 'curriculumVitae', documentName: 'CV', field: 'curriculumVitaeUrl' },
   { documentType: 'referenceLetters', documentName: 'Reference Letter(s)', field: 'referenceLettersUrl' },
   { documentType: 'portfolio', documentName: 'Portfolio', field: 'portfolioUrl' },
-  { documentType: 'applicationFeeReceipt', documentName: 'Application Fee Receipt', field: 'applicationFeeReceiptUrl' },
-  { documentType: 'offerLetter', documentName: 'Offer Letter', field: 'offerLetterUrl' },
-  { documentType: 'casLetter', documentName: 'CAS Letter', field: 'casLetterUrl' },
-  { documentType: 'visaDecisionLetter', documentName: 'Visa Decision Letter', field: 'visaDecisionLetterUrl' }
+  { documentType: 'applicationFeeReceipt', documentName: 'Application Fee Receipt', field: 'applicationFeeReceiptUrl' }
 ];
 
 const FINANCIAL_FIELDS: DocumentFieldConfig[] = [
   { documentType: 'proofOfFunds', documentName: 'Proof of Funds', field: 'proofOfFundsUrl' }
 ];
-
-const formatDisplayDate = (value: string | null) => {
-  if (!value) {
-    return 'N/A';
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
-  }).format(parsed);
-};
 
 const formatDocumentValue = (value: string | null) => {
   if (!value) {
@@ -124,46 +98,70 @@ const formatDocumentValue = (value: string | null) => {
   }
 };
 
-const renderDocumentLabel = (documentName: string) => {
-  if (documentName !== 'International Passport') {
-    return documentName;
-  }
-
-  return (
-    <>
-      International Passport
-      <span className="ml-0.5 text-red-400" aria-label="required">
-        *
-      </span>
-    </>
-  );
-};
+const renderDocumentLabel = (documentName: string) => documentName;
 
 const formatApplicationStatus = (value: ApplicationStatus) => value.toLowerCase().replace(/_/g, ' ');
 
-const mapApplicationToDetails = (application: Application) => ({
-  applicationStatus: application.applicationStatus,
-  universityName: application.universityName || 'Work Application',
-  degree: application.degreeType || application.skillOrProfession || 'Application',
-  applicationSummary: {
-    applicationId: application.id,
-    universityName: application.universityName || 'N/A',
-    universityCountry: application.universityCountry || 'N/A',
-    courseName: application.courseName || application.skillOrProfession || 'N/A',
-    degreeType: application.degreeType || 'N/A',
-    studyMode: application.studyMode || 'N/A',
-    intake: application.intake || 'N/A',
-    applicationDate: formatDisplayDate(application.applicationDate),
-    currentApplicationStatus: formatApplicationStatus(application.applicationStatus),
-    assignedAdmissionOfficer: 'TBD',
-    offerType: 'Pending',
-    offerDate: 'Pending',
-    casStatus: 'Not issued',
-    casNumber: 'N/A'
-  },
-  documents: [] as Array<{ documentName: string; documentUploaded: string }>,
-  financialInformation: [] as Array<{ documentName: string; documentUploaded: string }>
-});
+const getCountrySpecificOfferDocument = (application: Application) => {
+  const normalizedCountry = application.universityCountry?.trim().toLowerCase();
+
+  if (normalizedCountry === 'united kingdom') {
+    return {
+      label: 'CAS',
+      value: application.ukCasStatus || 'Pending'
+    };
+  }
+
+  if (normalizedCountry === 'australia') {
+    return {
+      label: 'CoE',
+      value: application.australiaCoeStatus || 'Pending'
+    };
+  }
+
+  if (normalizedCountry === 'united states') {
+    return {
+      label: 'I-20',
+      value: application.usaI20Status || 'Pending'
+    };
+  }
+
+  if (normalizedCountry === 'canada') {
+    return {
+      label: 'LOA',
+      value: application.canadaLoaStatus || 'Pending'
+    };
+  }
+
+  return null;
+};
+
+const mapApplicationToDetails = (application: Application, assignedAdmissionOfficerName: string) => {
+  const countrySpecificOfferDocument = getCountrySpecificOfferDocument(application);
+
+  return {
+    applicationStatus: application.applicationStatus,
+    universityName: application.universityName || 'Work Application',
+    degree: application.degreeType || application.skillOrProfession || 'Application',
+    applicationSummary: {
+      applicationId: application.id,
+      universityName: application.universityName || 'N/A',
+      universityCountry: application.universityCountry || 'N/A',
+      courseName: application.courseName || application.skillOrProfession || 'N/A',
+      degreeType: application.degreeType || 'N/A',
+      studyMode: application.studyMode || 'N/A',
+      intake: application.intake || 'N/A',
+      currentApplicationStatus: formatApplicationStatus(application.applicationStatus),
+      assignedAdmissionOfficer: assignedAdmissionOfficerName,
+      offerType: 'Pending',
+      offerDate: 'Pending',
+      countrySpecificOfferDocumentLabel: countrySpecificOfferDocument?.label ?? null,
+      countrySpecificOfferDocumentValue: countrySpecificOfferDocument?.value ?? null
+    },
+    documents: [] as Array<{ documentName: string; documentUploaded: string }>,
+    financialInformation: [] as Array<{ documentName: string; documentUploaded: string }>
+  };
+};
 
 export const ApplicationDetailsPage = () => {
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
@@ -171,18 +169,39 @@ export const ApplicationDetailsPage = () => {
   const [isUploading, setIsUploading] = useState<ApplicationDocumentType | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const { profile, isLoading: loading, refreshDashboardData } = useDashboardData();
-  const liveApplication = profile?.application ?? null;
   const { applicationId } = useParams();
+  const liveApplication =
+    profile?.applications.find((application) => application.id === applicationId) ??
+    (profile?.application?.id === applicationId ? (profile?.application ?? null) : null);
 
   const mockApplication = applicationId ? APPLICATION_DETAILS[applicationId as keyof typeof APPLICATION_DETAILS] : undefined;
   const mappedLiveApplication =
     liveApplication && applicationId && liveApplication.id === applicationId
-      ? mapApplicationToDetails(liveApplication)
+      ? mapApplicationToDetails(liveApplication, profile?.assignedAdmin?.fullName ?? 'Unassigned')
       : undefined;
   const application = mockApplication ?? mappedLiveApplication;
   const isLiveApplicationDetails = Boolean(liveApplication && applicationId && liveApplication.id === applicationId);
+  const canTrackApplication = !liveApplication || liveApplication.applicationType === 'study_scholarship';
+  const universityCountryValue = liveApplication?.universityCountry ?? application?.applicationSummary.universityCountry;
+  const normalizedUniversityCountry = universityCountryValue?.trim().toLowerCase();
+  const isCountryCanada = normalizedUniversityCountry === 'canada';
+  const isCountryUnitedStates = normalizedUniversityCountry === 'united states';
+  const shouldHideOfferFields = liveApplication
+    ? liveApplication.shouldShowOfferFields === false
+    : isCountryCanada;
+  const shouldShowOfferTypeInfo =
+    normalizedUniversityCountry === 'united kingdom' || normalizedUniversityCountry === 'australia';
+  const offerTypeLabel = liveApplication?.offerTypeLabel ?? (isCountryUnitedStates ? 'Admission Letter' : 'Offer Type');
+  const offerDateLabel = liveApplication?.offerDateLabel ?? (isCountryUnitedStates ? 'Admission Letter Date' : 'Offer Date');
+  const documentFields = DOCUMENT_FIELDS;
+  const applicationDocuments = application?.documents ?? [];
+  const displayedDocuments = applicationDocuments;
 
   const handleOpenTracker = async () => {
+    if (!canTrackApplication) {
+      return;
+    }
+
     setIsTrackerOpen(true);
 
     if (!isLiveApplicationDetails || !liveApplication) {
@@ -217,46 +236,7 @@ export const ApplicationDetailsPage = () => {
   if (!application) {
     return (
       <div className="flex min-h-screen flex-col bg-dark-bg">
-        <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-          <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-            <li>
-              <Link
-                to="/"
-                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-              >
-                Home
-              </Link>
-            </li>
-            <li aria-hidden className="text-zinc-600">
-              <CaretRight size={10} weight="bold" />
-            </li>
-            <li>
-              <Link
-                to="/dashboard"
-                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-              >
-                Dashboard
-              </Link>
-            </li>
-            <li aria-hidden className="text-zinc-600">
-              <CaretRight size={10} weight="bold" />
-            </li>
-            <li>
-              <Link
-                to="/dashboard/applications"
-                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-              >
-                My Applications
-              </Link>
-            </li>
-            <li aria-hidden className="text-zinc-600">
-              <CaretRight size={10} weight="bold" />
-            </li>
-            <li aria-current="page" className="font-medium text-zinc-100">
-              Details
-            </li>
-          </ol>
-        </nav>
+        <Navbar />
 
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl rounded-xl border border-white/10 bg-dark-card p-6">
@@ -274,60 +254,23 @@ export const ApplicationDetailsPage = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-dark-bg">
-      <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-        <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-          <li>
-            <Link
-              to="/"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Home
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li>
-            <Link
-              to="/dashboard"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Dashboard
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li>
-            <Link
-              to="/dashboard/applications"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              My Applications
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li aria-current="page" className="font-medium text-zinc-100">
-            Details
-          </li>
-        </ol>
-      </nav>
+      <Navbar />
 
       <main className="flex-1">
         <div className="mx-auto max-w-5xl px-5 py-6 sm:px-6">
           <h1 className="text-lg font-semibold text-zinc-100">{application.universityName} — {application.degree}</h1>
           <p className="mt-1 text-sm text-zinc-400">View and manage your application details, documents, and financial information.</p>
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => void handleOpenTracker()}
-              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
-            >
-              View tracker
-            </button>
-          </div>
+          {canTrackApplication ? (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleOpenTracker()}
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
+              >
+                View tracker
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="mx-auto max-w-5xl divide-y divide-white/10">
@@ -365,10 +308,6 @@ export const ApplicationDetailsPage = () => {
                 <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.intake}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Application Date</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.applicationDate}</p>
-              </div>
-              <div>
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Current Application Status</p>
                 <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.currentApplicationStatus}</p>
               </div>
@@ -376,32 +315,40 @@ export const ApplicationDetailsPage = () => {
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Assigned Admission Officer</p>
                 <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.assignedAdmissionOfficer}</p>
               </div>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-zinc-500">Offer Type</p>
-                  <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerType}</p>
+              {!shouldHideOfferFields ? (
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">{offerTypeLabel}</p>
+                    <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerType}</p>
+                  </div>
+                  {shouldShowOfferTypeInfo ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsOfferInfoOpen(true)}
+                      title="Learn more about offer types"
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300 transition-colors hover:bg-yellow-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+                    >
+                      <Question size={14} weight="bold" />
+                    </button>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsOfferInfoOpen(true)}
-                  title="Learn more about offer types"
-                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300 transition-colors hover:bg-yellow-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
-                >
-                  <Question size={14} weight="bold" />
-                </button>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Offer Date</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerDate}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">CAS Status</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.casStatus}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">CAS Number</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.casNumber}</p>
-              </div>
+              ) : null}
+              {!shouldHideOfferFields ? (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">{offerDateLabel}</p>
+                  <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerDate}</p>
+                </div>
+              ) : null}
+              {application.applicationSummary.countrySpecificOfferDocumentLabel ? (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">
+                    {application.applicationSummary.countrySpecificOfferDocumentLabel}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-zinc-200">
+                    {application.applicationSummary.countrySpecificOfferDocumentValue}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -416,7 +363,7 @@ export const ApplicationDetailsPage = () => {
             ) : null}
             <div className="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
               {isLiveApplicationDetails && liveApplication
-                ? DOCUMENT_FIELDS.map((document) => {
+                ? documentFields.map((document) => {
                     const uploadedFileValue = liveApplication[document.field];
 
                     return (
@@ -451,7 +398,7 @@ export const ApplicationDetailsPage = () => {
                       </div>
                     );
                   })
-                : application.documents.map((document) => (
+                : displayedDocuments.map((document) => (
                     <div key={document.documentName} className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-xs uppercase tracking-wide text-zinc-100">{renderDocumentLabel(document.documentName)}</p>
@@ -528,12 +475,15 @@ export const ApplicationDetailsPage = () => {
         </div>
       </main>
 
-      <ApplicationProgressModal
-        isOpen={isTrackerOpen}
-        onClose={() => setIsTrackerOpen(false)}
-        applicationStatus={application.applicationStatus}
-        universityName={application.applicationSummary.universityName}
-      />
+      {canTrackApplication ? (
+        <ApplicationProgressModal
+          isOpen={isTrackerOpen}
+          onClose={() => setIsTrackerOpen(false)}
+          applicationStatus={application.applicationStatus}
+          universityName={application.applicationSummary.universityName}
+          universityCountry={universityCountryValue}
+        />
+      ) : null}
 
       {isOfferInfoOpen && (
         <div

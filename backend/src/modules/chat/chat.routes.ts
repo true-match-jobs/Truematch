@@ -5,6 +5,7 @@ import {
 	adminConversationsHandler,
 	chatPeerHandler,
 	conversationMessagesHandler,
+	downloadChatAttachmentHandler,
 	markConversationReadHandler,
 	unreadSummaryHandler,
 	uploadChatAttachmentHandler
@@ -19,3 +20,4 @@ chatRouter.get('/conversations', authMiddleware, requireAdmin, asyncHandler(admi
 chatRouter.get('/unread-summary', authMiddleware, asyncHandler(unreadSummaryHandler));
 chatRouter.patch('/read/:peerUserId', authMiddleware, asyncHandler(markConversationReadHandler));
 chatRouter.post('/attachments', authMiddleware, uploadChatAttachment, asyncHandler(uploadChatAttachmentHandler));
+chatRouter.post('/attachments/download', authMiddleware, asyncHandler(downloadChatAttachmentHandler));

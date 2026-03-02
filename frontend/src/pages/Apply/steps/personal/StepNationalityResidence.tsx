@@ -43,7 +43,6 @@ export const StepNationalityResidence = ({ onSubmit, onBack, loading, initialVal
         label="Nationality"
         placeholder="Nigerian"
         error={errors.nationality?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('nationality')}
       />
       <Input
@@ -51,7 +50,6 @@ export const StepNationalityResidence = ({ onSubmit, onBack, loading, initialVal
         label="Country of Residence"
         placeholder="Nigeria"
         error={errors.countryOfResidence?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('countryOfResidence')}
       />
       <Input
@@ -59,7 +57,6 @@ export const StepNationalityResidence = ({ onSubmit, onBack, loading, initialVal
         label="State / Province"
         placeholder="Lagos"
         error={errors.stateOrProvince?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('stateOrProvince')}
       />
       <Input
@@ -67,7 +64,6 @@ export const StepNationalityResidence = ({ onSubmit, onBack, loading, initialVal
         label="Residential Address"
         placeholder="12 Herbert Macaulay Way, Yaba"
         error={errors.residentialAddress?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('residentialAddress')}
       />
 

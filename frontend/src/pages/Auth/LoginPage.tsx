@@ -54,7 +54,7 @@ export const LoginPage = () => {
       <Navbar />
       <main className="mx-auto flex flex-1 w-full max-w-xl flex-col items-center justify-center px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <div className="w-full space-y-8 rounded-2xl border border-white/40 bg-transparent p-6 sm:p-10">
-          <div className="space-y-2 text-center">
+          <div className="space-y-2 text-left">
             <h1 className="text-2xl font-bold text-white sm:text-3xl">Welcome back</h1>
             <p className="text-sm text-zinc-400">Sign in to continue your application journey.</p>
           </div>

@@ -1,7 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
-import { verifyAccessToken } from '../utils/jwt';
+import { prisma } from '../config/prisma';
+import { clearAuthCookies, verifyAccessToken } from '../utils/jwt';
 
-export const authMiddleware = (req: Request, res: Response, next: NextFunction): void => {
+export const authMiddleware = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const token = req.cookies.accessToken;
 
@@ -11,9 +12,38 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
     }
 
     const payload = verifyAccessToken(token);
+
+    if (payload.role === 'USER') {
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: {
+          emailVerifiedAt: true,
+          emailVerificationTokenExpiresAt: true
+        }
+      });
+
+      if (!user) {
+        clearAuthCookies(res);
+        res.status(401).json({ message: 'Unauthorized' });
+        return;
+      }
+
+      const verificationWindowExpired =
+        !user.emailVerifiedAt &&
+        user.emailVerificationTokenExpiresAt &&
+        user.emailVerificationTokenExpiresAt.getTime() <= Date.now();
+
+      if (verificationWindowExpired) {
+        clearAuthCookies(res);
+        res.status(401).json({ message: 'Email verification window has expired. Please sign in again.' });
+        return;
+      }
+    }
+
     req.user = payload;
     next();
   } catch (_error) {
+    clearAuthCookies(res);
     res.status(401).json({ message: 'Invalid or expired token' });
   }
 };

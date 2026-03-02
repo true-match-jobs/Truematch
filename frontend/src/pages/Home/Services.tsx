@@ -17,6 +17,12 @@ const services = [
     description:
       'From offer letter to CAS and visa application, we guide you through the entire process.',
   },
+  {
+    id: '04',
+    title: 'Employment & Work Abroad Support',
+    description:
+      'We support qualified foreign professionals seeking employment opportunities in the UK, Canada, and Australia through structured job-readiness guidance and end-to-end relocation assistance.',
+  },
 ];
 
 export const Services = () => {

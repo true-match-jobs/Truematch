@@ -13,6 +13,7 @@ type ChatUser = {
   id: string;
   fullName: string;
   email: string;
+  profilePhotoUrl: string | null;
   role: UserRole;
   createdAt: Date;
   updatedAt: Date;
@@ -44,6 +45,18 @@ type ChatAttachmentUploadResult = {
   mimeType: string;
   name: string;
   previewUrl?: string;
+};
+
+type DownloadChatAttachmentParams = {
+  url: string;
+  name: string;
+  mimeType?: string;
+};
+
+type DownloadChatAttachmentResult = {
+  buffer: Buffer;
+  contentType: string;
+  fileName: string;
 };
 
 const uploadBufferToCloudinary = async (
@@ -86,6 +99,7 @@ const getAssignedAdmin = async (): Promise<ChatUser | null> => {
       id: true,
       fullName: true,
       email: true,
+      profilePhotoUrl: true,
       role: true,
       createdAt: true,
       updatedAt: true
@@ -103,6 +117,7 @@ const getUserByIdAndRole = async (userId: string, role: UserRole): Promise<ChatU
       id: true,
       fullName: true,
       email: true,
+      profilePhotoUrl: true,
       role: true,
       createdAt: true,
       updatedAt: true
@@ -216,6 +231,7 @@ export const getAdminConversations = async (adminUserId: string): Promise<AdminC
       id: true,
       fullName: true,
       email: true,
+      profilePhotoUrl: true,
       role: true,
       createdAt: true,
       updatedAt: true
@@ -326,27 +342,12 @@ export const uploadChatAttachmentFile = async (file: Express.Multer.File): Promi
     throw new AppError(400, 'Only PDF and image files are allowed');
   }
 
-  const uploadedFile = await uploadBufferToCloudinary(file, 'image');
+  const resourceType: 'image' | 'raw' = isPdf ? 'raw' : 'image';
+  const uploadedFile = await uploadBufferToCloudinary(file, resourceType);
 
-  const pdfDownloadUrl = isPdf
-    ? cloudinary.url(uploadedFile.public_id, {
-        secure: true,
-        resource_type: 'image',
-        type: 'upload',
-        flags: 'attachment',
-        format: 'pdf'
-      })
-    : uploadedFile.secure_url;
+  const pdfDownloadUrl = isPdf ? uploadedFile.secure_url : uploadedFile.secure_url;
 
-  const pdfPreviewUrl = isPdf
-    ? cloudinary.url(uploadedFile.public_id, {
-        secure: true,
-        resource_type: 'image',
-        type: 'upload',
-        page: 1,
-        format: 'jpg'
-      })
-    : undefined;
+  const pdfPreviewUrl = undefined;
 
   return {
     url: uploadedFile.secure_url,
@@ -354,5 +355,41 @@ export const uploadChatAttachmentFile = async (file: Express.Multer.File): Promi
     mimeType: file.mimetype,
     name: file.originalname,
     previewUrl: pdfPreviewUrl
+  };
+};
+
+export const downloadChatAttachmentFile = async (
+  params: DownloadChatAttachmentParams
+): Promise<DownloadChatAttachmentResult> => {
+  const parsedUrl = new URL(params.url);
+
+  if (parsedUrl.protocol !== 'https:') {
+    throw new AppError(400, 'Only HTTPS attachment URLs are allowed');
+  }
+
+  if (parsedUrl.hostname !== 'res.cloudinary.com') {
+    throw new AppError(400, 'Unsupported attachment host');
+  }
+
+  if (!parsedUrl.pathname.includes('/truematch/chat-attachments/')) {
+    throw new AppError(400, 'Unsupported attachment path');
+  }
+
+  const response = await fetch(parsedUrl.toString());
+
+  if (!response.ok) {
+    throw new AppError(502, 'Unable to download attachment from storage provider');
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const sanitizedFileName = params.name
+    .replace(/[\r\n]/g, ' ')
+    .replace(/["\\]/g, '')
+    .trim();
+
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    contentType: response.headers.get('content-type') ?? params.mimeType ?? 'application/octet-stream',
+    fileName: sanitizedFileName || 'attachment'
   };
 };

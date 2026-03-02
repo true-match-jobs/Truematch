@@ -12,6 +12,22 @@ type PrivateMessagePayload = {
   createdAt: string;
 };
 
+type PresenceStatus = {
+  userId: string;
+  isOnline: boolean;
+};
+
+type PresenceUpdatePayload = {
+  type: 'presence_update';
+  userId: string;
+  isOnline: boolean;
+};
+
+type PresenceSnapshotPayload = {
+  type: 'presence_snapshot';
+  statuses: PresenceStatus[];
+};
+
 const isPrivateMessagePayload = (value: unknown): value is PrivateMessagePayload => {
   if (!value || typeof value !== 'object') {
     return false;
@@ -29,6 +45,41 @@ const isPrivateMessagePayload = (value: unknown): value is PrivateMessagePayload
   );
 };
 
+const isPresenceUpdatePayload = (value: unknown): value is PresenceUpdatePayload => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const maybePayload = value as Partial<PresenceUpdatePayload>;
+
+  return (
+    maybePayload.type === 'presence_update' &&
+    typeof maybePayload.userId === 'string' &&
+    typeof maybePayload.isOnline === 'boolean'
+  );
+};
+
+const isPresenceSnapshotPayload = (value: unknown): value is PresenceSnapshotPayload => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const maybePayload = value as Partial<PresenceSnapshotPayload>;
+
+  if (maybePayload.type !== 'presence_snapshot' || !Array.isArray(maybePayload.statuses)) {
+    return false;
+  }
+
+  return maybePayload.statuses.every((status) => {
+    if (!status || typeof status !== 'object') {
+      return false;
+    }
+
+    const maybeStatus = status as Partial<PresenceStatus>;
+    return typeof maybeStatus.userId === 'string' && typeof maybeStatus.isOnline === 'boolean';
+  });
+};
+
 type ChatContext = {
   isOnChatTab: boolean;
   activePeerUserId: string | null;
@@ -37,9 +88,11 @@ type ChatContext = {
 type ChatNotificationState = {
   unreadUserMessageCount: number;
   unreadAdminUserIds: string[];
+  presenceByUserId: Record<string, boolean>;
   context: ChatContext;
   connect: (user: User) => void;
   disconnect: () => void;
+  subscribeToPresence: (userIds: string[]) => void;
   setContext: (context: ChatContext) => void;
   clearUserUnread: () => void;
   clearAdminUnreadForUser: (userId: string) => void;
@@ -53,6 +106,22 @@ let connectedUserRole: User['role'] | null = null;
 let connectionConsumers = 0;
 let reconnectTimeoutId: number | null = null;
 let isReconnecting = false;
+let desiredPresenceUserIds = new Set<string>();
+
+const getDesiredPresenceUserIds = (): string[] => Array.from(desiredPresenceUserIds);
+
+const sendPresenceSubscription = () => {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  socket.send(
+    JSON.stringify({
+      type: 'presence_subscribe',
+      userIds: getDesiredPresenceUserIds()
+    })
+  );
+};
 
 const clearReconnectTimeout = () => {
   if (reconnectTimeoutId !== null) {
@@ -85,9 +154,38 @@ const setupSocket = (set: (partial: Partial<ChatNotificationState> | ((state: Ch
 
   socket = chatService.createSocket();
 
+  socket.onopen = () => {
+    sendPresenceSubscription();
+  };
+
   socket.onmessage = (event) => {
     try {
       const payload = JSON.parse(event.data as string) as unknown;
+
+      if (isPresenceSnapshotPayload(payload)) {
+        set((state) => {
+          const nextPresenceByUserId = { ...state.presenceByUserId };
+
+          payload.statuses.forEach((status) => {
+            nextPresenceByUserId[status.userId] = status.isOnline;
+          });
+
+          return {
+            presenceByUserId: nextPresenceByUserId
+          };
+        });
+        return;
+      }
+
+      if (isPresenceUpdatePayload(payload)) {
+        set((state) => ({
+          presenceByUserId: {
+            ...state.presenceByUserId,
+            [payload.userId]: payload.isOnline
+          }
+        }));
+        return;
+      }
 
       if (!isPrivateMessagePayload(payload)) {
         return;
@@ -124,6 +222,18 @@ const setupSocket = (set: (partial: Partial<ChatNotificationState> | ((state: Ch
   socket.onclose = () => {
     socket = null;
 
+    set((state) => {
+      const nextPresenceByUserId = { ...state.presenceByUserId };
+
+      getDesiredPresenceUserIds().forEach((userId) => {
+        nextPresenceByUserId[userId] = false;
+      });
+
+      return {
+        presenceByUserId: nextPresenceByUserId
+      };
+    });
+
     if (connectionConsumers <= 0) {
       return;
     }
@@ -157,6 +267,7 @@ const setupSocket = (set: (partial: Partial<ChatNotificationState> | ((state: Ch
 export const useChatNotificationStore = create<ChatNotificationState>((set, get) => ({
   unreadUserMessageCount: 0,
   unreadAdminUserIds: [],
+  presenceByUserId: {},
   context: {
     isOnChatTab: false,
     activePeerUserId: null
@@ -189,6 +300,31 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
     if (connectionConsumers === 0) {
       closeSocket();
     }
+  },
+
+  subscribeToPresence: (userIds) => {
+    desiredPresenceUserIds = new Set(
+      userIds
+        .filter((value) => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    );
+
+    set((state) => {
+      const nextPresenceByUserId = { ...state.presenceByUserId };
+
+      getDesiredPresenceUserIds().forEach((userId) => {
+        if (typeof nextPresenceByUserId[userId] !== 'boolean') {
+          nextPresenceByUserId[userId] = false;
+        }
+      });
+
+      return {
+        presenceByUserId: nextPresenceByUserId
+      };
+    });
+
+    sendPresenceSubscription();
   },
 
   setContext: (context) => {
@@ -226,10 +362,12 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
 
   reset: () => {
     connectionConsumers = 0;
+    desiredPresenceUserIds = new Set<string>();
     closeSocket();
     set({
       unreadUserMessageCount: 0,
       unreadAdminUserIds: [],
+      presenceByUserId: {},
       context: {
         isOnChatTab: false,
         activePeerUserId: null

@@ -1,8 +1,10 @@
-import { ArrowRight, CaretRight, RadioButton } from '@phosphor-icons/react';
+import { ArrowRight, RadioButton } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Footer } from '../../components/layout/Footer';
+import { Navbar } from '../../components/layout/Navbar';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Snackbar } from '../../components/ui/Snackbar';
 import { applicationService, type AdminApplicationDetails } from '../../services/application.service';
 import { APPLICATION_STATUS, type ApplicationStatus } from '../../../../shared/applicationStatus';
 
@@ -21,8 +23,6 @@ const ADMIN_PROGRESS_OPTIONS: ReadonlyArray<{
   { label: 'Under Review', value: APPLICATION_STATUS.UNDER_REVIEW },
   { label: 'Offer Issued', value: APPLICATION_STATUS.OFFER_ISSUED }
 ];
-
-type AdminProgressStageState = 'completed' | 'current' | 'pending';
 
 const formatApplicationType = (value: string) => {
   if (value === 'study_scholarship') {
@@ -180,68 +180,12 @@ export const AdminApplicationDetailsPage = () => {
     }
   };
 
-  const getStageState = (
-    applicationStatus: ApplicationStatus,
-    stageValue: (typeof STATUS_ORDER)[number]
-  ): AdminProgressStageState => {
-    const currentIndex = STATUS_ORDER.indexOf(applicationStatus);
-    const stageIndex = STATUS_ORDER.indexOf(stageValue);
-
-    if (currentIndex === -1 || stageIndex === -1) {
-      return 'pending';
-    }
-
-    const currentStageIndex = currentIndex <= 0 ? 1 : currentIndex;
-
-    if (stageIndex < currentStageIndex) {
-      return 'completed';
-    }
-
-    if (stageIndex === currentStageIndex) {
-      return 'current';
-    }
-
-    return 'pending';
-  };
-
   return (
     <div className="flex min-h-screen flex-col bg-dark-bg">
-      <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-        <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-          <li>
-            <Link
-              to="/"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Home
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li>
-            <Link
-              to="/admin/dashboard"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Admin Dashboard
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li aria-current="page" className="font-medium text-zinc-100">
-            Details
-          </li>
-        </ol>
-      </nav>
+      <Navbar />
 
       <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        {showStatusSuccessToast ? (
-          <div className="fixed right-4 top-4 z-50 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-200">
-            Application status updated
-          </div>
-        ) : null}
+        <Snackbar message="Application status updated" visible={showStatusSuccessToast} />
 
         <div className="mx-auto max-w-4xl rounded-xl border border-white/10 bg-dark-card p-6">
           {isLoading ? <LoadingSpinner className="py-8" /> : null}

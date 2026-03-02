@@ -44,7 +44,6 @@ export const StepEmailPassword = ({ onSubmit, onBack, loading, initialValues }: 
         label="Email"
         placeholder="name@example.com"
         error={errors.email?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('email')}
       />
       <Input
@@ -53,7 +52,6 @@ export const StepEmailPassword = ({ onSubmit, onBack, loading, initialValues }: 
         label="Password"
         placeholder="••••••••"
         error={errors.password?.message}
-        className="glass-border border-white/10 focus:border-white/20"
         {...register('password')}
       />
 

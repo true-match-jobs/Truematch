@@ -5,9 +5,9 @@ type SearchUniversityNamesResponse = {
 };
 
 export const universityService = {
-  async searchNames(query: string): Promise<string[]> {
+  async searchNames(query: string, country?: string): Promise<string[]> {
     const response = await api.get<SearchUniversityNamesResponse>('/universities/names', {
-      params: { query }
+      params: country ? { query, country } : { query }
     });
 
     return response.data.names;

@@ -3,15 +3,18 @@ import { APPLICATION_STATUS, type ApplicationStatus } from '../../../../shared/a
 import { AppError } from '../../utils/app-error';
 import { setAuthCookies } from '../../utils/jwt';
 import {
+  deleteApplicationByIdForAdmin,
+  deleteApplicationById,
   getAllApplicationsForAdmin,
   getApplicationDetailsForAdmin,
   getApplicationStatusById,
   markApplicationTrackerViewed,
+  reapplyApplication,
   submitApplication,
   updateApplicationStatusById,
   uploadApplicationDocumentByType
 } from './application.service';
-import { applicationDocumentTypeSchema, submitApplicationSchema } from './application.validation';
+import { applicationDocumentTypeSchema, reapplyApplicationSchema, submitApplicationSchema } from './application.validation';
 
 const ADMIN_UPDATABLE_APPLICATION_STATUSES: ApplicationStatus[] = [
   APPLICATION_STATUS.SUBMITTED_TO_UNIVERSITY,
@@ -33,6 +36,20 @@ export const submitApplicationHandler = async (req: Request, res: Response): Pro
     message: 'Application submitted successfully',
     user: result.user,
     application: result.application
+  });
+};
+
+export const reapplyApplicationHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const dto = reapplyApplicationSchema.parse(req.body);
+  const application = await reapplyApplication(req.user.userId, dto);
+
+  res.status(201).json({
+    message: 'Application re-submitted successfully',
+    application
   });
 };
 
@@ -92,6 +109,7 @@ export const getApplicationByIdHandler = async (req: Request, res: Response): Pr
   res.status(200).json({
     id: application.id,
     universityName: application.universityName,
+    universityCountry: application.universityCountry,
     applicationStatus: application.applicationStatus
   });
 };
@@ -109,8 +127,14 @@ export const getApplicationTrackerByIdHandler = async (req: Request, res: Respon
     throw new AppError(404, 'Application not found');
   }
 
+  if (application.applicationType !== 'study_scholarship') {
+    throw new AppError(400, 'Tracker is available for study applications only');
+  }
+
   res.status(200).json({
     id: application.id,
+    universityName: application.universityName,
+    universityCountry: application.universityCountry,
     applicationStatus: application.applicationStatus
   });
 };
@@ -173,4 +197,32 @@ export const markApplicationTrackerViewedHandler = async (req: Request, res: Res
   const result = await markApplicationTrackerViewed(applicationId, req.user.userId);
 
   res.status(200).json(result);
+};
+
+export const deleteApplicationHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const applicationId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  if (!applicationId) {
+    throw new AppError(400, 'Application id is required');
+  }
+
+  await deleteApplicationById(applicationId, req.user.userId);
+
+  res.status(200).json({ message: 'Application deleted successfully' });
+};
+
+export const deleteApplicationForAdminHandler = async (req: Request, res: Response): Promise<void> => {
+  const applicationId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+  if (!applicationId) {
+    throw new AppError(400, 'Application id is required');
+  }
+
+  await deleteApplicationByIdForAdmin(applicationId);
+
+  res.status(200).json({ message: 'Application deleted successfully' });
 };
