@@ -98,10 +98,11 @@ export const decodeAttachmentMessageContent = (
 };
 
 const resolveWsUrl = (): string => {
-  const wsUrl = import.meta.env.VITE_WS_URL;
+  const wsUrl = import.meta.env.VITE_WS_BASE_URL ?? import.meta.env.VITE_WS_URL;
   if (wsUrl) return wsUrl;
 
-  const apiBaseUrl = import.meta.env.VITE_API_URL ?? '/api/v1';
+  const apiBaseUrl =
+    import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? '/api/v1';
   if (apiBaseUrl.startsWith('http://') || apiBaseUrl.startsWith('https://')) {
     const parsed = new URL(apiBaseUrl);
     parsed.protocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
