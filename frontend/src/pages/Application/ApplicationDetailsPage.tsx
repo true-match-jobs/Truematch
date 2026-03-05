@@ -1,10 +1,21 @@
 import { useState } from 'react';
-import { CaretRight, Question, X } from '@phosphor-icons/react';
-import { Link, useParams } from 'react-router-dom';
+import { Question, X } from '@phosphor-icons/react';
+import { useParams } from 'react-router-dom';
+import {
+  APPLICATION_STATUS,
+  type ApplicationStatus
+} from '../../../../shared/applicationStatus';
+import { ApplicationProgressModal } from '../../components/application/ApplicationProgressModal';
 import { Footer } from '../../components/layout/Footer';
+import { Navbar } from '../../components/layout/Navbar';
+import { Breadcrumbs } from '../../components/ui/Breadcrumbs';
+import { useDashboardData } from '../../hooks/useDashboardData';
+import { applicationService } from '../../services/application.service';
+import type { Application, ApplicationDocumentType } from '../../types/user';
 
 const APPLICATION_DETAILS = {
   'app-001': {
+    applicationStatus: APPLICATION_STATUS.UNDER_REVIEW,
     universityName: 'University of Manchester',
     degree: 'MSc Data Science',
     applicationSummary: {
@@ -15,13 +26,12 @@ const APPLICATION_DETAILS = {
       degreeType: 'MSc',
       studyMode: 'Full-time',
       intake: 'September 2026',
-      applicationDate: '12 February 2026',
       currentApplicationStatus: 'Under review',
-      assignedAdmissionOfficer: 'Sarah Morgan',
+      assignedAdmissionOfficer: 'TBD',
       offerType: 'Conditional',
       offerDate: 'Pending',
-      casStatus: 'Not issued',
-      casNumber: 'N/A'
+      countrySpecificOfferDocumentLabel: 'CAS',
+      countrySpecificOfferDocumentValue: 'Pending'
     },
     documents: [
       { documentName: 'International Passport', documentUploaded: 'my_passport.pdf' },
@@ -32,10 +42,7 @@ const APPLICATION_DETAILS = {
       { documentName: 'CV', documentUploaded: 'my_cv.pdf' },
       { documentName: 'Reference Letter(s)', documentUploaded: 'my_reference_letter.pdf' },
       { documentName: 'Portfolio', documentUploaded: 'portfolio.pdf' },
-      { documentName: 'Application Fee Receipt', documentUploaded: 'application_fee_receipt.pdf' },
-      { documentName: 'Offer Letter', documentUploaded: 'offer_letter.pdf' },
-      { documentName: 'CAS Letter', documentUploaded: 'cas_letter.pdf' },
-      { documentName: 'Visa Decision Letter', documentUploaded: 'visa_decision_letter.pdf' }
+      { documentName: 'Application Fee Receipt', documentUploaded: 'application_fee_receipt.pdf' }
     ],
     financialInformation: [
       { documentName: 'Proof of Funds', documentUploaded: 'proof_of_funds.pdf' }
@@ -43,68 +50,202 @@ const APPLICATION_DETAILS = {
   }
 };
 
-const UPLOAD_DOCUMENTS = new Set(['Application Fee Receipt', 'Proof of Funds']);
-const APPLICATION_PROGRESS_STEPS = [
-  { label: 'Application Pending', status: 'completed', description: 'completed' },
-  { label: 'Submitted to University', status: 'completed', description: 'completed' },
-  { label: 'Under Review', status: 'pending', description: 'Current stage' },
-  { label: 'Offer Issued', status: 'pending', description: 'pending' }
-] as const;
+type DocumentFieldConfig = {
+  documentType: ApplicationDocumentType;
+  documentName: string;
+  field: keyof Pick<
+    Application,
+    | 'internationalPassportUrl'
+    | 'academicTranscriptsUrl'
+    | 'degreeCertificatesUrl'
+    | 'ieltsToeflCertificateUrl'
+    | 'statementOfPurposeUrl'
+    | 'curriculumVitaeUrl'
+    | 'referenceLettersUrl'
+    | 'portfolioUrl'
+    | 'applicationFeeReceiptUrl'
+    | 'proofOfFundsUrl'
+  >;
+};
+
+const DOCUMENT_FIELDS: DocumentFieldConfig[] = [
+  { documentType: 'internationalPassport', documentName: 'International Passport', field: 'internationalPassportUrl' },
+  { documentType: 'academicTranscripts', documentName: 'Academic Transcript(s)', field: 'academicTranscriptsUrl' },
+  { documentType: 'degreeCertificates', documentName: 'Degree Certificate(s)', field: 'degreeCertificatesUrl' },
+  { documentType: 'ieltsToeflCertificate', documentName: 'IELTS/TOEFL Certificate', field: 'ieltsToeflCertificateUrl' },
+  { documentType: 'statementOfPurpose', documentName: 'Statement of Purpose (SOP)', field: 'statementOfPurposeUrl' },
+  { documentType: 'curriculumVitae', documentName: 'CV', field: 'curriculumVitaeUrl' },
+  { documentType: 'referenceLetters', documentName: 'Reference Letter(s)', field: 'referenceLettersUrl' },
+  { documentType: 'portfolio', documentName: 'Portfolio', field: 'portfolioUrl' },
+  { documentType: 'applicationFeeReceipt', documentName: 'Application Fee Receipt', field: 'applicationFeeReceiptUrl' }
+];
+
+const FINANCIAL_FIELDS: DocumentFieldConfig[] = [
+  { documentType: 'proofOfFunds', documentName: 'Proof of Funds', field: 'proofOfFundsUrl' }
+];
+
+const formatDocumentValue = (value: string | null) => {
+  if (!value) {
+    return 'Not uploaded';
+  }
+
+  try {
+    const url = new URL(value);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const fileName = segments[segments.length - 1];
+    return decodeURIComponent(fileName ?? value);
+  } catch (_error) {
+    return value;
+  }
+};
+
+const renderDocumentLabel = (documentName: string) => documentName;
+
+const formatApplicationStatus = (value: ApplicationStatus) => value.toLowerCase().replace(/_/g, ' ');
+
+const getCountrySpecificOfferDocument = (application: Application) => {
+  const normalizedCountry = application.universityCountry?.trim().toLowerCase();
+
+  if (normalizedCountry === 'united kingdom') {
+    return {
+      label: 'CAS',
+      value: application.ukCasStatus || 'Pending'
+    };
+  }
+
+  if (normalizedCountry === 'australia') {
+    return {
+      label: 'CoE',
+      value: application.australiaCoeStatus || 'Pending'
+    };
+  }
+
+  if (normalizedCountry === 'united states') {
+    return {
+      label: 'I-20',
+      value: application.usaI20Status || 'Pending'
+    };
+  }
+
+  if (normalizedCountry === 'canada') {
+    return {
+      label: 'LOA',
+      value: application.canadaLoaStatus || 'Pending'
+    };
+  }
+
+  return null;
+};
+
+const mapApplicationToDetails = (application: Application, assignedAdmissionOfficerName: string) => {
+  const countrySpecificOfferDocument = getCountrySpecificOfferDocument(application);
+  const resolvedApplicationStatus = application.applicationStatus ?? APPLICATION_STATUS.APPLICATION_PENDING;
+
+  return {
+    applicationStatus: resolvedApplicationStatus,
+    universityName: application.universityName || 'Work Application',
+    degree: application.degreeType || application.skillOrProfession || 'Application',
+    applicationSummary: {
+      applicationId: application.id,
+      universityName: application.universityName || 'N/A',
+      universityCountry: application.universityCountry || 'N/A',
+      courseName: application.courseName || application.skillOrProfession || 'N/A',
+      degreeType: application.degreeType || 'N/A',
+      studyMode: application.studyMode || 'N/A',
+      intake: application.intake || 'N/A',
+      currentApplicationStatus: formatApplicationStatus(resolvedApplicationStatus),
+      assignedAdmissionOfficer: assignedAdmissionOfficerName,
+      offerType: 'Pending',
+      offerDate: 'Pending',
+      countrySpecificOfferDocumentLabel: countrySpecificOfferDocument?.label ?? null,
+      countrySpecificOfferDocumentValue: countrySpecificOfferDocument?.value ?? null
+    },
+    documents: [] as Array<{ documentName: string; documentUploaded: string }>,
+    financialInformation: [] as Array<{ documentName: string; documentUploaded: string }>
+  };
+};
 
 export const ApplicationDetailsPage = () => {
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [isOfferInfoOpen, setIsOfferInfoOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState<ApplicationDocumentType | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const { profile, isLoading: loading, refreshDashboardData } = useDashboardData();
   const { applicationId } = useParams();
-  const application = applicationId ? APPLICATION_DETAILS[applicationId as keyof typeof APPLICATION_DETAILS] : undefined;
+  const liveApplication =
+    profile?.applications.find((application) => application.id === applicationId) ??
+    (profile?.application?.id === applicationId ? (profile?.application ?? null) : null);
+
+  const mockApplication = applicationId ? APPLICATION_DETAILS[applicationId as keyof typeof APPLICATION_DETAILS] : undefined;
+  const mappedLiveApplication =
+    liveApplication && applicationId && liveApplication.id === applicationId
+      ? mapApplicationToDetails(liveApplication, profile?.assignedAdmin?.fullName ?? 'Unassigned')
+      : undefined;
+  const application = mockApplication ?? mappedLiveApplication;
+  const isLiveApplicationDetails = Boolean(liveApplication && applicationId && liveApplication.id === applicationId);
+  const canTrackApplication = !liveApplication || liveApplication.applicationType === 'study_scholarship';
+  const universityCountryValue = liveApplication?.universityCountry ?? application?.applicationSummary.universityCountry;
+  const normalizedUniversityCountry = universityCountryValue?.trim().toLowerCase();
+  const isCountryCanada = normalizedUniversityCountry === 'canada';
+  const isCountryUnitedStates = normalizedUniversityCountry === 'united states';
+  const shouldHideOfferFields = liveApplication
+    ? liveApplication.shouldShowOfferFields === false
+    : isCountryCanada;
+  const shouldShowOfferTypeInfo =
+    normalizedUniversityCountry === 'united kingdom' || normalizedUniversityCountry === 'australia';
+  const offerTypeLabel = liveApplication?.offerTypeLabel ?? (isCountryUnitedStates ? 'Admission Letter' : 'Offer Type');
+  const offerDateLabel = liveApplication?.offerDateLabel ?? (isCountryUnitedStates ? 'Admission Letter Date' : 'Offer Date');
+  const documentFields = DOCUMENT_FIELDS;
+  const applicationDocuments = application?.documents ?? [];
+  const displayedDocuments = applicationDocuments;
+
+  const handleOpenTracker = async () => {
+    if (!canTrackApplication) {
+      return;
+    }
+
+    setIsTrackerOpen(true);
+
+    if (!isLiveApplicationDetails || !liveApplication) {
+      return;
+    }
+
+    try {
+      await applicationService.markTrackerViewed(liveApplication.id);
+      await refreshDashboardData();
+    } catch (_error) {
+      return;
+    }
+  };
+
+  const handleDocumentUpload = async (documentType: ApplicationDocumentType, file: File) => {
+    if (!liveApplication) {
+      return;
+    }
+
+    try {
+      setUploadError(null);
+      setIsUploading(documentType);
+      await applicationService.uploadDocument(liveApplication.id, documentType, file);
+      await refreshDashboardData();
+    } catch (_error) {
+      setUploadError('Unable to upload document. Please upload a PDF or image file and try again.');
+    } finally {
+      setIsUploading(null);
+    }
+  };
 
   if (!application) {
     return (
       <div className="flex min-h-screen flex-col bg-dark-bg">
-        <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-          <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-            <li>
-              <Link
-                to="/"
-                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-              >
-                Home
-              </Link>
-            </li>
-            <li aria-hidden className="text-zinc-600">
-              <CaretRight size={10} weight="bold" />
-            </li>
-            <li>
-              <Link
-                to="/dashboard"
-                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-              >
-                Dashboard
-              </Link>
-            </li>
-            <li aria-hidden className="text-zinc-600">
-              <CaretRight size={10} weight="bold" />
-            </li>
-            <li>
-              <Link
-                to="/dashboard/applications"
-                className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-              >
-                My Applications
-              </Link>
-            </li>
-            <li aria-hidden className="text-zinc-600">
-              <CaretRight size={10} weight="bold" />
-            </li>
-            <li aria-current="page" className="font-medium text-zinc-100">
-              Details
-            </li>
-          </ol>
-        </nav>
+        <Navbar />
 
         <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-4xl rounded-xl border border-white/10 bg-dark-card p-6">
-            <h1 className="text-lg font-semibold text-zinc-100">Application not found</h1>
-            <p className="mt-2 text-sm text-zinc-400">This application could not be located.</p>
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">Application not found</h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              {loading ? 'Loading your application data...' : 'This application could not be located.'}
+            </p>
           </div>
         </main>
 
@@ -115,60 +256,30 @@ export const ApplicationDetailsPage = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-dark-bg">
-      <nav aria-label="Breadcrumb" className="border-b border-white/10 px-4 py-2.5 sm:px-6 lg:px-8">
-        <ol className="flex items-center gap-1.5 text-xs text-zinc-400">
-          <li>
-            <Link
-              to="/"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Home
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li>
-            <Link
-              to="/dashboard"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              Dashboard
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li>
-            <Link
-              to="/dashboard/applications"
-              className="rounded px-1 py-0.5 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-500"
-            >
-              My Applications
-            </Link>
-          </li>
-          <li aria-hidden className="text-zinc-600">
-            <CaretRight size={10} weight="bold" />
-          </li>
-          <li aria-current="page" className="font-medium text-zinc-100">
-            Details
-          </li>
-        </ol>
-      </nav>
+      <Navbar />
 
       <main className="flex-1">
-        <div className="mx-auto max-w-5xl px-5 py-6 sm:px-6">
-          <h1 className="text-lg font-semibold text-zinc-100">{application.universityName} — {application.degree}</h1>
+        <div className="mx-auto max-w-5xl px-5 py-4 sm:px-6">
+          <Breadcrumbs
+            items={[
+              { label: 'Dashboard', href: '/dashboard' },
+              { label: 'Applications', href: '/dashboard/applications' },
+              { label: 'Details' }
+            ]}
+          />
+          <h1 className="mt-4 text-xl font-semibold tracking-tight text-zinc-100">{application.universityName} — {application.degree}</h1>
           <p className="mt-1 text-sm text-zinc-400">View and manage your application details, documents, and financial information.</p>
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setIsTrackerOpen(true)}
-              className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
-            >
-              View tracker
-            </button>
-          </div>
+          {canTrackApplication ? (
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => void handleOpenTracker()}
+                className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
+              >
+                View tracker
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="mx-auto max-w-5xl divide-y divide-white/10">
@@ -206,10 +317,6 @@ export const ApplicationDetailsPage = () => {
                 <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.intake}</p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Application Date</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.applicationDate}</p>
-              </div>
-              <div>
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Current Application Status</p>
                 <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.currentApplicationStatus}</p>
               </div>
@@ -217,32 +324,40 @@ export const ApplicationDetailsPage = () => {
                 <p className="text-xs uppercase tracking-wide text-zinc-500">Assigned Admission Officer</p>
                 <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.assignedAdmissionOfficer}</p>
               </div>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-zinc-500">Offer Type</p>
-                  <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerType}</p>
+              {!shouldHideOfferFields ? (
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">{offerTypeLabel}</p>
+                    <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerType}</p>
+                  </div>
+                  {shouldShowOfferTypeInfo ? (
+                    <button
+                      type="button"
+                      onClick={() => setIsOfferInfoOpen(true)}
+                      title="Learn more about offer types"
+                      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300 transition-colors hover:bg-yellow-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
+                    >
+                      <Question size={14} weight="bold" />
+                    </button>
+                  ) : null}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsOfferInfoOpen(true)}
-                  title="Learn more about offer types"
-                  className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-yellow-400/20 text-yellow-300 transition-colors hover:bg-yellow-400/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-400"
-                >
-                  <Question size={14} weight="bold" />
-                </button>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">Offer Date</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerDate}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">CAS Status</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.casStatus}</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-zinc-500">CAS Number</p>
-                <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.casNumber}</p>
-              </div>
+              ) : null}
+              {!shouldHideOfferFields ? (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">{offerDateLabel}</p>
+                  <p className="mt-1 text-sm font-medium text-zinc-200">{application.applicationSummary.offerDate}</p>
+                </div>
+              ) : null}
+              {application.applicationSummary.countrySpecificOfferDocumentLabel ? (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">
+                    {application.applicationSummary.countrySpecificOfferDocumentLabel}
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-zinc-200">
+                    {application.applicationSummary.countrySpecificOfferDocumentValue}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </section>
 
@@ -250,21 +365,62 @@ export const ApplicationDetailsPage = () => {
             <div className="px-5 py-4 sm:px-6">
               <h2 className="text-base font-semibold uppercase tracking-wide text-zinc-100">Documents</h2>
             </div>
+            {uploadError ? (
+              <div className="px-5 sm:px-6">
+                <p className="rounded-lg bg-rose-500/10 px-4 py-2.5 text-sm text-rose-400">{uploadError}</p>
+              </div>
+            ) : null}
             <div className="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
-              {application.documents.map((document) => (
-                <div key={document.documentName} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-wide text-zinc-100">{document.documentName}</p>
-                    <p className="mt-1 truncate text-sm font-medium text-zinc-500">{document.documentUploaded}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="mt-0.5 shrink-0 rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
-                  >
-                    {UPLOAD_DOCUMENTS.has(document.documentName) ? 'Upload' : 'Update'}
-                  </button>
-                </div>
-              ))}
+              {isLiveApplicationDetails && liveApplication
+                ? documentFields.map((document) => {
+                    const uploadedFileValue = liveApplication[document.field];
+
+                    return (
+                      <div key={document.documentType} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs uppercase tracking-wide text-zinc-100">{renderDocumentLabel(document.documentName)}</p>
+                          <p className="mt-1 truncate text-sm font-medium text-zinc-500">{formatDocumentValue(uploadedFileValue)}</p>
+                        </div>
+
+                        <label className="mt-0.5 shrink-0">
+                          <input
+                            type="file"
+                            accept=".pdf,image/*"
+                            className="sr-only"
+                            onChange={(event) => {
+                              const selectedFile = event.target.files?.[0];
+                              if (selectedFile) {
+                                void handleDocumentUpload(document.documentType, selectedFile);
+                              }
+                              event.currentTarget.value = '';
+                            }}
+                            disabled={Boolean(isUploading)}
+                          />
+                          <span className="inline-flex cursor-pointer items-center rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-500">
+                            {isUploading === document.documentType
+                              ? 'Uploading...'
+                              : uploadedFileValue
+                                ? 'Update'
+                                : 'Upload'}
+                          </span>
+                        </label>
+                      </div>
+                    );
+                  })
+                : displayedDocuments.map((document) => (
+                    <div key={document.documentName} className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-wide text-zinc-100">{renderDocumentLabel(document.documentName)}</p>
+                        <p className="mt-1 truncate text-sm font-medium text-zinc-500">{document.documentUploaded}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-0.5 shrink-0 rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
+                      >
+                        {document.documentUploaded ? 'Update' : 'Upload'}
+                      </button>
+                    </div>
+                  ))}
             </div>
           </section>
 
@@ -273,82 +429,70 @@ export const ApplicationDetailsPage = () => {
               <h2 className="text-base font-semibold uppercase tracking-wide text-zinc-100">Financial Information</h2>
             </div>
             <div className="grid gap-4 px-5 py-5 sm:grid-cols-2 sm:px-6">
-              {application.financialInformation.map((document) => (
-                <div key={document.documentName} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-wide text-zinc-100">{document.documentName}</p>
-                    <p className="mt-1 truncate text-sm font-medium text-zinc-500">{document.documentUploaded}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="mt-0.5 shrink-0 rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
-                  >
-                    Upload
-                  </button>
-                </div>
-              ))}
+              {isLiveApplicationDetails && liveApplication
+                ? FINANCIAL_FIELDS.map((document) => {
+                    const uploadedFileValue = liveApplication[document.field];
+
+                    return (
+                      <div key={document.documentType} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs uppercase tracking-wide text-zinc-100">{document.documentName}</p>
+                          <p className="mt-1 truncate text-sm font-medium text-zinc-500">{formatDocumentValue(uploadedFileValue)}</p>
+                        </div>
+
+                        <label className="mt-0.5 shrink-0">
+                          <input
+                            type="file"
+                            accept=".pdf,image/*"
+                            className="sr-only"
+                            onChange={(event) => {
+                              const selectedFile = event.target.files?.[0];
+                              if (selectedFile) {
+                                void handleDocumentUpload(document.documentType, selectedFile);
+                              }
+                              event.currentTarget.value = '';
+                            }}
+                            disabled={Boolean(isUploading)}
+                          />
+                          <span className="inline-flex cursor-pointer items-center rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-500">
+                            {isUploading === document.documentType
+                              ? 'Uploading...'
+                              : uploadedFileValue
+                                ? 'Update'
+                                : 'Upload'}
+                          </span>
+                        </label>
+                      </div>
+                    );
+                  })
+                : application.financialInformation.map((document) => (
+                    <div key={document.documentName} className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-wide text-zinc-100">{document.documentName}</p>
+                        <p className="mt-1 truncate text-sm font-medium text-zinc-500">{document.documentUploaded}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="mt-0.5 shrink-0 rounded-md bg-brand-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg"
+                      >
+                        {document.documentUploaded ? 'Update' : 'Upload'}
+                      </button>
+                    </div>
+                  ))}
             </div>
           </section>
         </div>
       </main>
 
-      {isTrackerOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="application-progress-title"
-          onClick={() => setIsTrackerOpen(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-xl border border-white/10 bg-dark-card p-5 sm:p-6"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 id="application-progress-title" className="text-base font-semibold text-zinc-100">
-                  Application Progress
-                </h3>
-                <p className="mt-1 text-sm text-zinc-400">Track your current application stage.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTrackerOpen(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-zinc-400 transition-colors hover:bg-white/15 hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                aria-label="Close tracker"
-              >
-                <X size={16} weight="bold" />
-              </button>
-            </div>
-
-            <div className="mt-5">
-              {APPLICATION_PROGRESS_STEPS.map((step, index) => {
-                const isCompleted = step.status === 'completed';
-                const isLast = index === APPLICATION_PROGRESS_STEPS.length - 1;
-
-                return (
-                  <div key={step.label} className={`relative flex items-start gap-3 ${isLast ? '' : 'pb-8'}`}>
-                    <div className="relative flex w-7 justify-center">
-                      <div
-                        className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
-                          isCompleted ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'
-                        }`}
-                      >
-                        {index + 1}
-                      </div>
-                      {!isLast && <div className="absolute left-1/2 top-7 h-[calc(100%+2rem)] w-px -translate-x-1/2 bg-white/15" />}
-                    </div>
-                    <div className="pt-0.5">
-                      <p className="text-sm font-medium text-zinc-100">{step.label}</p>
-                      <p className="mt-0.5 text-xs uppercase tracking-wide text-zinc-400">{step.description}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {canTrackApplication ? (
+        <ApplicationProgressModal
+          isOpen={isTrackerOpen}
+          onClose={() => setIsTrackerOpen(false)}
+          applicationStatus={application.applicationStatus}
+          universityName={application.applicationSummary.universityName}
+          universityCountry={universityCountryValue}
+        />
+      ) : null}
 
       {isOfferInfoOpen && (
         <div

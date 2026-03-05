@@ -1,15 +1,13 @@
 import axios, { AxiosError } from 'axios';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
+const baseURL = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export const api = axios.create({
   baseURL,
   withCredentials: true
 });
 
-let isRefreshing = false;
-let refreshQueue: Array<() => void> = [];
-let hasRefreshFailed = false;
+let refreshPromise: Promise<void> | null = null;
 
 api.interceptors.response.use(
   (response) => response,
@@ -20,31 +18,28 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       originalRequest &&
       !originalRequest.url?.includes('/auth/refresh') &&
-      !(originalRequest as { _retry?: boolean })._retry &&
-      !hasRefreshFailed
+      !(originalRequest as { _retry?: boolean })._retry
     ) {
       (originalRequest as { _retry?: boolean })._retry = true;
 
-      if (!isRefreshing) {
-        isRefreshing = true;
-
-        try {
-          await api.post('/auth/refresh');
-          hasRefreshFailed = false;
-          refreshQueue.forEach((cb) => cb());
-          refreshQueue = [];
-        } catch (_refreshError) {
-          hasRefreshFailed = true;
-          refreshQueue = [];
-          return Promise.reject(error);
-        } finally {
-          isRefreshing = false;
-        }
+      if (!refreshPromise) {
+        refreshPromise = api
+          .post('/auth/refresh')
+          .then(() => undefined)
+          .finally(() => {
+            refreshPromise = null;
+          });
       }
 
-      return new Promise((resolve) => {
-        refreshQueue.push(() => resolve(api(originalRequest)));
-      });
+      try {
+        await refreshPromise;
+        return api(originalRequest);
+      } catch (_refreshError) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        }
+        return Promise.reject(error);
+      }
     }
 
     return Promise.reject(error);

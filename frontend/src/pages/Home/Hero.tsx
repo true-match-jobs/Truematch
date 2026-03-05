@@ -1,54 +1,68 @@
-import { useEffect, useState } from 'react';
+import { useState, type FormEvent } from 'react';
+import type { AxiosError } from 'axios';
+import { MagnifyingGlass } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
+import type { ApplicationStatus } from '../../../../shared/applicationStatus';
+import { ApplicationProgressModal } from '../../components/application/ApplicationProgressModal';
+import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
-
-const typingBadgePrefixes = ['Study abroad, simplified', 'Work abroad, simplified'];
-const TYPE_SPEED_MS = 85;
-const DELETE_SPEED_MS = 55;
-const PAUSE_AFTER_TYPING_MS = 1400;
-const PAUSE_AFTER_DELETING_MS = 280;
+import { applicationService } from '../../services/application.service';
+import { useDashboardStore } from '../../store/dashboard.store';
 
 export const Hero = () => {
-  const [badgeTextIndex, setBadgeTextIndex] = useState(0);
-  const [typedBadgeText, setTypedBadgeText] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const loadDashboardData = useDashboardStore((state) => state.loadDashboardData);
+  const [applicationId, setApplicationId] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [trackerError, setTrackerError] = useState<string | null>(null);
+  const [trackerStatus, setTrackerStatus] = useState<ApplicationStatus | null>(null);
+  const [trackerUniversityName, setTrackerUniversityName] = useState<string>('');
+  const [trackerUniversityCountry, setTrackerUniversityCountry] = useState<string | null>(null);
+  const [isTrackerOpen, setIsTrackerOpen] = useState(false);
 
-  useEffect(() => {
-    const currentWord = typingBadgePrefixes[badgeTextIndex];
+  const handleTrackerSearch = async () => {
+    const trimmedApplicationId = applicationId.trim();
 
-    if (!isDeleting && typedBadgeText === currentWord) {
-      const timeoutId = window.setTimeout(() => {
-        setIsDeleting(true);
-      }, PAUSE_AFTER_TYPING_MS);
-
-      return () => {
-        window.clearTimeout(timeoutId);
-      };
+    if (!trimmedApplicationId) {
+      setTrackerError('Enter your application ID to track progress.');
+      return;
     }
 
-    if (isDeleting && typedBadgeText.length === 0) {
-      const timeoutId = window.setTimeout(() => {
-        setIsDeleting(false);
-        setBadgeTextIndex((currentIndex) => (currentIndex + 1) % typingBadgePrefixes.length);
-      }, PAUSE_AFTER_DELETING_MS);
+    try {
+      setTrackerError(null);
+      setIsSearching(true);
+      const tracker = await applicationService.getTrackerStatus(trimmedApplicationId);
+      setTrackerStatus(tracker.applicationStatus);
+      setTrackerUniversityName(tracker.universityName ?? '');
+      setTrackerUniversityCountry(tracker.universityCountry ?? null);
+      setIsTrackerOpen(true);
 
-      return () => {
-        window.clearTimeout(timeoutId);
-      };
+      if (isAuthenticated && user?.role === 'USER') {
+        try {
+          await applicationService.markTrackerViewed(trimmedApplicationId);
+          await loadDashboardData(true, false);
+        } catch (_error) {
+          return;
+        }
+      }
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      const backendMessage = axiosError.response?.data?.message;
+
+      if (backendMessage === 'Tracker is available for study applications only') {
+        setTrackerError('Tracking is available for study applications only.');
+      } else {
+        setTrackerError('Application not found. Please check the ID and try again.');
+      }
+    } finally {
+      setIsSearching(false);
     }
+  };
 
-    const timeoutId = window.setTimeout(() => {
-      setTypedBadgeText(
-        isDeleting
-          ? currentWord.slice(0, typedBadgeText.length - 1)
-          : currentWord.slice(0, typedBadgeText.length + 1)
-      );
-    }, isDeleting ? DELETE_SPEED_MS : TYPE_SPEED_MS);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [badgeTextIndex, isDeleting, typedBadgeText]);
+  const handleTrackerSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await handleTrackerSearch();
+  };
 
   return (
     <section className="relative overflow-hidden bg-dark-bg">
@@ -59,33 +73,57 @@ export const Hero = () => {
       />
 
       <div className="relative mx-auto flex min-h-[85vh] w-full max-w-6xl flex-col items-center justify-center px-4 text-center sm:px-6 lg:px-8">
-        <span className="glass mb-8 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-semibold tracking-wide text-brand-300">
-          <span aria-live="polite" className="inline-flex min-w-[13.5rem] items-center justify-center text-center">
-            {typedBadgeText}
-            <span aria-hidden className="ml-0.5 inline-block h-3.5 w-px bg-brand-300/80 animate-pulse" />
-          </span>
-        </span>
+        <div className="mb-8 w-full max-w-xl text-left">
+          <label htmlFor="application-tracker" className="mb-2 block text-xs font-semibold tracking-wide text-zinc-300">
+            Track the status of your study application
+          </label>
+          <form onSubmit={(event) => void handleTrackerSubmit(event)} className="glass-border relative rounded-xl">
+            <input
+              id="application-tracker"
+              type="search"
+              placeholder="Enter your application ID"
+              value={applicationId}
+              onChange={(event) => setApplicationId(event.target.value)}
+              className="w-full rounded-xl border border-transparent bg-transparent py-3 pl-4 pr-24 text-sm text-zinc-100 placeholder-zinc-500 outline-none transition-colors focus:border-white/20"
+            />
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="absolute right-1 top-1/2 inline-flex h-[calc(100%-0.5rem)] -translate-y-1/2 items-center justify-center gap-1.5 rounded-lg bg-brand-600 px-3 text-xs font-medium text-white transition-colors hover:bg-brand-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 disabled:cursor-not-allowed disabled:opacity-70"
+              aria-label="Search application"
+            >
+              <MagnifyingGlass size={14} weight="regular" />
+              <span>{isSearching ? 'Searching...' : 'Search'}</span>
+            </button>
+          </form>
+          {trackerError ? <p className="mt-2 text-xs text-rose-400">{trackerError}</p> : null}
+        </div>
 
         <h1 className="mx-auto max-w-4xl text-balance text-center text-4xl font-extrabold leading-[1.1] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
           Your trusted platform for{' '}
-          <span className="text-gradient-brand">Africa&apos;s global learners</span>
+          <span className="text-gradient-brand">global learners and international job seekers</span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-2xl text-center text-base leading-relaxed text-zinc-400 sm:text-lg">
-          Start your application journey for schools in top destinations with a guided, secure, and fast process.
+          Start your study or work abroad journey in top global destinations with a guided, secure, and efficient process.
         </p>
 
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link to="/apply">
             <Button className="px-8 py-3 text-sm">Start Your Application</Button>
           </Link>
-          <Link to="/login">
-            <Button variant="ghost" className="px-8 py-3 text-sm">
-              Login
-            </Button>
-          </Link>
         </div>
       </div>
+
+      {trackerStatus ? (
+        <ApplicationProgressModal
+          isOpen={isTrackerOpen}
+          onClose={() => setIsTrackerOpen(false)}
+          applicationStatus={trackerStatus}
+          universityName={trackerUniversityName}
+          universityCountry={trackerUniversityCountry}
+        />
+      ) : null}
     </section>
   );
 };

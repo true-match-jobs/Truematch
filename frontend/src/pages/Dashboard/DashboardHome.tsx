@@ -1,57 +1,165 @@
-import { useAuth } from '../../hooks/useAuth';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { useDashboardData } from '../../hooks/useDashboardData';
+import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight } from '@phosphor-icons/react';
-
-const summaryItems = [
-  { label: 'Total Applications', value: 8 },
-  { label: 'Applications In Progress', value: 3 },
-  { label: 'Offers Received', value: 2 },
-  { label: 'Pending Actions', value: 4 }
-];
-
-const recentApplications = [
-  {
-    id: 'app-001',
-    universityName: 'University of Manchester',
-    course: 'MSc Data Science',
-    status: 'Under review'
-  },
-  {
-    id: 'app-002',
-    universityName: 'University of Leeds',
-    course: 'MSc Business Analytics',
-    status: 'Interview scheduled'
-  },
-  {
-    id: 'app-003',
-    universityName: 'University of Birmingham',
-    course: 'MSc Cyber Security',
-    status: 'Offer received'
-  }
-];
-
-const nextActions = ['Upload Missing Document', 'Pay Deposit', 'Accept Offer', 'Complete Profile'];
-
-const deadlines = [
-  { label: 'Deposit Deadline', date: '15 Mar 2026' },
-  { label: 'CAS Deadline', date: '22 Mar 2026' },
-  { label: 'Intake Start Date', date: '28 Sep 2026' }
-];
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { authService } from '../../services/auth.service';
+import { useChatNotificationStore } from '../../store/chat-notification.store';
+import { useDashboardStore } from '../../store/dashboard.store';
+import { buildInitialAvatarUrl } from '../../utils/avatar';
 
 export const DashboardHome = () => {
-  const { user } = useAuth();
+  const { profile, isLoading: loading, errorMessage, refreshDashboardData } = useDashboardData();
+  const [copiedApplicationId, setCopiedApplicationId] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const applications = profile?.applications ?? (profile?.application ? [profile.application] : []);
+  const recentApplications = applications.slice(0, 3);
+  const summaryItems = useMemo(
+    () => [
+      { label: 'Total Applications', value: applications.length },
+      { label: 'Applications In Progress', value: applications.length },
+      { label: 'Offers Received', value: 0 }
+    ],
+    [applications.length]
+  );
+
+  const getApplicationDetailsPath = (applicationId: string, applicationType: string) =>
+    applicationType === 'work_employment' ? `/applications/${applicationId}/employment` : `/applications/${applicationId}`;
+  const assignedAdmin = profile?.assignedAdmin;
+  const presenceByUserId = useChatNotificationStore((state) => state.presenceByUserId);
+  const subscribeToPresence = useChatNotificationStore((state) => state.subscribeToPresence);
+  const isAssignedAdminOnline = assignedAdmin?.id ? Boolean(presenceByUserId[assignedAdmin.id]) : false;
+
+  const handleCopyApplicationId = async (event: React.MouseEvent<HTMLButtonElement>, applicationId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      await navigator.clipboard.writeText(applicationId);
+      setCopiedApplicationId(applicationId);
+      window.setTimeout(() => {
+        setCopiedApplicationId(null);
+      }, 1400);
+    } catch (_error) {
+      setCopiedApplicationId(null);
+    }
+  };
+
+  const preventRowNavigation = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  useEffect(() => {
+    if (!profile || profile.hasVisitedDashboard) {
+      return;
+    }
+
+    let isSubscribed = true;
+
+    const persistDashboardVisit = async () => {
+      try {
+        await authService.markMeDashboardVisited();
+
+        if (!isSubscribed) {
+          return;
+        }
+
+        useDashboardStore.setState((state) => ({
+          ...state,
+          profile: state.profile
+            ? {
+                ...state.profile,
+                hasVisitedDashboard: true
+              }
+            : state.profile
+        }));
+      } catch (_error) {}
+    };
+
+    void persistDashboardVisit();
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [profile]);
+
+  useEffect(() => {
+    const assignedAdminId = assignedAdmin?.id;
+
+    if (!assignedAdminId) {
+      subscribeToPresence([]);
+      return;
+    }
+
+    subscribeToPresence([assignedAdminId]);
+  }, [assignedAdmin?.id, subscribeToPresence]);
+
+  useEffect(() => {
+    let intervalId: number | undefined;
+
+    const startPolling = () => {
+      if (intervalId !== undefined || document.visibilityState !== 'visible') {
+        return;
+      }
+
+      intervalId = window.setInterval(() => {
+        void refreshDashboardData();
+      }, 5000);
+    };
+
+    const stopPolling = () => {
+      if (intervalId === undefined) {
+        return;
+      }
+
+      window.clearInterval(intervalId);
+      intervalId = undefined;
+    };
+
+    const handleFocusRefresh = () => {
+      void refreshDashboardData();
+    };
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshDashboardData();
+        startPolling();
+        return;
+      }
+
+      stopPolling();
+    };
+
+    startPolling();
+
+    window.addEventListener('focus', handleFocusRefresh);
+    document.addEventListener('visibilitychange', handleVisibilityRefresh);
+
+    return () => {
+      stopPolling();
+      window.removeEventListener('focus', handleFocusRefresh);
+      document.removeEventListener('visibilitychange', handleVisibilityRefresh);
+    };
+  }, [refreshDashboardData]);
+
+  const handleGoToChat = () => {
+    if (assignedAdmin?.id) {
+      navigate(`/chat/${assignedAdmin.id}`);
+    } else {
+      navigate('/dashboard/chat');
+    }
+  };
 
   return (
-    <div className="h-full overflow-y-auto px-3 py-5 sm:px-5">
-      <div className="space-y-6">
-        <section className="glass-border rounded-xl bg-dark-card p-6">
-          <h2 className="text-xl font-semibold text-zinc-100">Welcome back, {user?.fullName ?? 'Applicant'}</h2>
-          <p className="mt-2 text-sm text-zinc-400">Track your applications and next steps here.</p>
-        </section>
+    <div className="h-full overflow-y-auto px-3 pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-5">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-100 mb-10">Dashboard</h2>
+      <div className="pb-10">
 
         <section>
           <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Quick Summary</h3>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {summaryItems.map((item) => (
               <article key={item.label} className="glass-border rounded-xl bg-dark-card p-5">
                 <p className="text-sm text-zinc-400">{item.label}</p>
@@ -61,80 +169,105 @@ export const DashboardHome = () => {
           </div>
         </section>
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          <section className="glass-border rounded-xl bg-dark-card p-5 xl:col-span-2">
+        <div className="mt-12 grid gap-4 xl:grid-cols-3">
+          <section className="glass-border min-w-0 rounded-xl bg-dark-card p-5">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Recent Applications</h3>
-            <ul className="mt-4 divide-y divide-white/10">
-              {recentApplications.map((application) => (
-                <li
-                  key={application.id}
-                  className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+            {loading && !profile ? <LoadingSpinner className="mt-4 py-10" /> : null}
+            {errorMessage ? <p className="mt-4 text-sm text-rose-400">{errorMessage}</p> : null}
+            {!loading && !errorMessage && recentApplications.length === 0 ? (
+              <div className="mt-4 rounded-xl border border-white/10 bg-transparent p-4">
+                <p className="text-sm text-zinc-300">No application submitted yet.</p>
+                <Link
+                  to="/apply"
+                  className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand-400 transition-colors hover:text-brand-300"
                 >
-                  <div>
-                    <p className="text-sm font-semibold text-zinc-100">{application.universityName}</p>
-                    <p className="mt-1 text-sm text-zinc-400">{application.course}</p>
-                    <p className="mt-2 text-xs font-medium uppercase tracking-wide text-zinc-300">{application.status}</p>
-                  </div>
+                  Start application
+                  <ArrowRight size={14} weight="bold" />
+                </Link>
+              </div>
+            ) : null}
+            {!loading && !errorMessage && recentApplications.length > 0 ? (
+              <ul className="mt-4 space-y-3">
+                {recentApplications.map((application) => {
+                  const isStudyApplication = application.applicationType === 'study_scholarship';
+                  const cardTitle = isStudyApplication
+                    ? application.universityName || 'Work Application'
+                    : application.skillOrProfession || 'Work Application';
+                  const cardSubtitle = isStudyApplication
+                    ? application.courseName || application.skillOrProfession || 'N/A'
+                    : application.workCountry || 'N/A';
 
-                  <Link
-                    to={`/applications/${application.id}`}
-                    className="inline-flex items-center gap-1 self-end text-sm font-medium text-brand-400 transition-colors hover:text-brand-300 sm:self-auto"
-                  >
-                    View
-                    <ArrowRight size={14} weight="bold" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="rounded-xl border border-red-500/20 bg-red-500/10 p-5 backdrop-blur-sm">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-red-300">Next Action Required</h3>
-            <ul className="mt-4 space-y-1">
-              {nextActions.map((action) => (
-                <li key={action} className="py-1.5 text-sm text-red-300">
-                  {action}
-                </li>
-              ))}
-            </ul>
+                  return (
+                    <li
+                      key={application.id}
+                      className="rounded-xl border border-white/10 bg-transparent p-4"
+                    >
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-zinc-100">{cardTitle}</p>
+                          <p className="mt-1 text-sm text-zinc-400">{cardSubtitle}</p>
+                          {application.createdAt && (
+                            <p className="mt-1 text-xs text-zinc-500">Submitted on {new Date(application.createdAt).toLocaleDateString()}</p>
+                          )}
+                        </div>
+                        <div className="flex w-full sm:w-auto justify-end">
+                          <Link
+                            to={getApplicationDetailsPath(application.id, application.applicationType)}
+                            className="inline-flex items-center gap-1 text-sm font-medium text-brand-400 transition-colors hover:text-brand-300"
+                          >
+                            View
+                            <ArrowRight size={14} weight="bold" />
+                          </Link>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
           </section>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="mt-12 grid gap-4 lg:grid-cols-2">
           <section className="glass-border rounded-xl bg-dark-card p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Assigned Officer</h3>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Assigned Agent</h3>
             <div className="mt-4 flex flex-col items-end">
               <div className="flex w-full items-center gap-3">
                 <div className="relative">
                   <img
-                    src="https://api.dicebear.com/9.x/avataaars/svg?seed=sarah-morgan"
-                    alt="Sarah Morgan avatar"
+                    src={
+                      assignedAdmin?.profilePhotoUrl ??
+                      buildInitialAvatarUrl({
+                        fullName: assignedAdmin?.fullName,
+                        email: assignedAdmin?.email,
+                        id: assignedAdmin?.id,
+                        fallback: 'Advisor',
+                        size: 40
+                      })
+                    }
+                    alt={`${assignedAdmin?.fullName ?? 'Assigned agent'} avatar`}
                     className="h-10 w-10 rounded-full bg-dark-surface"
                   />
-                  <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border border-dark-card bg-emerald-400" aria-hidden />
+                  <span
+                    className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border border-dark-card ${
+                      isAssignedAdminOnline ? 'bg-emerald-400' : 'bg-zinc-500'
+                    }`}
+                    aria-hidden
+                  />
                 </div>
-                <p className="text-base font-semibold text-zinc-100">Sarah Morgan</p>
+                <div>
+                  <p className="text-base font-semibold text-zinc-100">{assignedAdmin?.fullName ?? 'Assigned agent pending'}</p>
+                </div>
               </div>
 
-              <Link
-                to="/chat"
+              <button
+                type="button"
+                onClick={handleGoToChat}
                 className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-400 transition-colors hover:text-brand-300"
               >
                 Go to Chat
                 <ArrowRight size={14} weight="bold" />
-              </Link>
-            </div>
-          </section>
-
-          <section className="glass-border rounded-xl bg-dark-card p-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-zinc-300">Important Deadlines</h3>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-              {deadlines.map((deadline) => (
-                <article key={deadline.label} className="rounded-xl border border-white/10 bg-dark-surface p-4">
-                  <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">{deadline.label}</p>
-                  <p className="mt-2 text-sm font-semibold text-zinc-100">{deadline.date}</p>
-                </article>
-              ))}
+              </button>
             </div>
           </section>
         </div>

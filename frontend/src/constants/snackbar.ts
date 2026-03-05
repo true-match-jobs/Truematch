@@ -1,0 +1,1 @@
+export const SNACKBAR_AUTO_DISMISS_DELAY_MS = 6000;

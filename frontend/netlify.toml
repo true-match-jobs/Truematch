@@ -1,0 +1,22 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # VITE_* variables are intentionally exposed in browser bundles.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_API_BASE_URL,VITE_WS_BASE_URL,VITE_SITE_URL"
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://truematch-o121.onrender.com/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/ws"
+  to = "wss://truematch-o121.onrender.com/ws"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

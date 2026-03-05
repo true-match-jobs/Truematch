@@ -16,23 +16,113 @@ enum ApplicationStatus {
   SUBMITTED
 }
 
+enum NotificationMessageType {
+  SYSTEM_MESSAGE
+  ADMIN_MESSAGE
+}
+
 model User {
   id        String   @id @default(uuid())
   fullName  String
   email     String   @unique
+  dateOfBirth String?
+  gender String?
+  countryCode String?
+  phoneNumber String?
+  nationality String?
+  countryOfResidence String?
+  stateOrProvince String?
+  residentialAddress String?
+  passportNumber String?
+  passportExpiryDate String?
+  profilePhotoUrl String?
+  hasVisitedDashboard Boolean @default(false)
   password  String
+  emailVerifiedAt DateTime?
+  emailVerificationTokenHash String?
+  emailVerificationTokenExpiresAt DateTime?
+  emailVerificationLastSentAt DateTime?
   role      UserRole @default(USER)
-  application Application?
+  applications Application[]
+  sentMessages ChatMessage[] @relation("SentMessages")
+  receivedMessages ChatMessage[] @relation("ReceivedMessages")
+  sentNotifications Notification[] @relation("NotificationSender")
+  receivedNotifications Notification[] @relation("NotificationRecipient")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model Notification {
+  id String @id
+  recipientUserId String
+  senderUserId String?
+  message String
+  messageType NotificationMessageType
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipientUser User @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  senderUser User? @relation("NotificationSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, createdAt])
+  @@index([recipientUserId, readAt])
+  @@index([messageType, createdAt])
+}
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  content    String
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  fromUser User @relation("SentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("ReceivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([fromUserId, toUserId, createdAt])
+  @@index([toUserId, fromUserId, createdAt])
+  @@index([toUserId, isRead])
+}
+
 model Application {
   id        String            @id @default(uuid())
-  userId    String            @unique
+  userId    String
+  applicationType String
+  skillOrProfession String?
+  workCountry String?
+  universityName String?
+  universityCountry String?
+  courseName String?
+  degreeType String?
+  studyMode String?
+  intake String?
+  internationalPassportUrl String?
+  academicTranscriptsUrl String?
+  degreeCertificatesUrl String?
+  ieltsToeflCertificateUrl String?
+  statementOfPurposeUrl String?
+  curriculumVitaeUrl String?
+  referenceLettersUrl String?
+  portfolioUrl String?
+  applicationFeeReceiptUrl String?
+  offerLetterUrl String?
+  casLetterUrl String?
+  visaDecisionLetterUrl String?
+  proofOfFundsUrl String?
+  ukCasStatus String?
+  australiaCoeStatus String?
+  usaI20Status String?
+  canadaLoaStatus String?
+  hasViewedTracker Boolean @default(false)
+  hasAdminViewed Boolean @default(false)
+  applicationStatus String?
   status    ApplicationStatus @default(SUBMITTED)
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
   user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

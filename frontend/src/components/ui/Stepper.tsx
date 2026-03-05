@@ -5,29 +5,26 @@ type Props = {
 
 export const Stepper = ({ steps, currentStep }: Props) => {
   return (
-    <div className="flex items-center justify-center gap-3">
-      {steps.map((step, index) => {
-        const isActive = currentStep === index;
-        const isCompleted = currentStep > index;
+    <div className="mx-auto w-full max-w-[220px] px-2" aria-label="Progress" role="group">
+      <div className="relative flex items-center justify-between">
+        <div aria-hidden className="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-white/10" />
 
-        return (
-          <div key={step} className="flex items-center gap-3">
+        {steps.map((step, index) => {
+          const isActive = currentStep === index;
+          const isCompleted = currentStep > index;
+
+          return (
             <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold transition-colors ${
-                isCompleted
-                  ? 'border-brand-600 bg-brand-600 text-white'
-                  : isActive
-                    ? 'border-brand-500 text-brand-400'
-                    : 'border-white/10 text-zinc-500'
+              key={step}
+              aria-label={`Step ${index + 1}: ${step}`}
+              aria-current={isActive ? 'step' : undefined}
+              className={`relative h-3.5 w-3.5 rounded-full border-2 transition-colors ${
+                isCompleted ? 'border-brand-600 bg-brand-600' : isActive ? 'border-brand-500 bg-dark-card' : 'border-white/20 bg-dark-card'
               }`}
-            >
-              {index + 1}
-            </div>
-            <span className={`text-sm ${isActive ? 'font-medium text-white' : 'text-zinc-500'}`}>{step}</span>
-            {index < steps.length - 1 ? <div className="h-px w-8 bg-white/10" /> : null}
-          </div>
-        );
-      })}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 };
