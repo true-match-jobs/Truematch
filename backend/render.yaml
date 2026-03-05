@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: 5000
       - key: FRONTEND_ORIGIN
-        value: https://truematch.netlify.app
+        value: https://precious-valkyrie-0e8095.netlify.app
       # SECURITY: Set these in Render Dashboard → Environment → Secret Files
       # Never commit actual secret values to version control
       - key: DATABASE_URL
