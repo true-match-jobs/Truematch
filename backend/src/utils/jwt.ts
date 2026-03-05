@@ -11,7 +11,9 @@ export type JwtPayload = {
 const baseCookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  // Production frontend and API are on different origins, so auth cookies
+  // must use SameSite=None (with Secure) to be sent on XHR/fetch requests.
+  sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as const,
   path: '/'
 };
 
