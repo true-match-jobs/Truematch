@@ -13,7 +13,7 @@ const baseCookieOptions = {
   secure: env.NODE_ENV === 'production',
   // Production frontend and API are on different origins, so auth cookies
   // must use SameSite=None (with Secure) to be sent on XHR/fetch requests.
-  sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as const,
+  sameSite: env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
   path: '/'
 };
 
