@@ -13,12 +13,14 @@ services:
         value: 5000
       - key: FRONTEND_ORIGIN
         value: https://truematch.netlify.app
+      # SECURITY: Set these in Render Dashboard → Environment → Secret Files
+      # Never commit actual secret values to version control
       - key: DATABASE_URL
-        value: postgresql://postgres.hpglxumzlspykverdbby:qs%3Fpcvc7BB5%2B9eP@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
+        sync: false  # Set in Render dashboard
       - key: JWT_ACCESS_SECRET
-        value: c2hvJtHSoG/RjpgXUNytmH9zGgs7IADX2V37yuuuqM39cdizh6PwQ1T4NjymXsEl/SW573jOng1to6IDzKvNdw==
+        sync: false  # Set in Render dashboard
       - key: JWT_REFRESH_SECRET
-        value: /8AoHAlVLM04E85jz+KLlBh9fdImtsAh3JOIfkLCY6Q6X6I1oyCkhLwzv+VpOtB04cEiuAKKy7b+YDGE4862Qw==
+        sync: false  # Set in Render dashboard
       - key: ACCESS_TOKEN_EXPIRES_IN
         value: 15m
       - key: REFRESH_TOKEN_EXPIRES_IN
@@ -30,7 +32,7 @@ services:
       - key: SMTP_USER
         value: noreply@truematch.chat
       - key: SMTP_PASS
-        value: vpgx6VfYrdMf
+        sync: false  # Set in Render dashboard
       - key: SMTP_FROM_EMAIL
         value: noreply@truematch.chat
       - key: SMTP_FROM_NAME
@@ -42,6 +44,6 @@ services:
       - key: CLOUDINARY_CLOUD_NAME
         value: dykntxvyw
       - key: CLOUDINARY_API_KEY
-        value: 367258928425611
+        sync: false  # Set in Render dashboard
       - key: CLOUDINARY_API_SECRET
-        value: eGs2tcXDwVRW3v0sCUszBdBxY-A
+        sync: false  # Set in Render dashboard
