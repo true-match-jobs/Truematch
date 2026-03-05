@@ -18,5 +18,28 @@ export default defineConfig({
         ws: true
       }
     }
+  },
+  build: {
+    target: 'esnext',
+    minify: 'terser',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': [
+            'react',
+            'react-dom',
+            'react-router-dom',
+            'axios',
+            'zustand',
+            'react-hook-form'
+          ],
+          'ui': [
+            '@phosphor-icons/react',
+            'framer-motion'
+          ]
+        }
+      }
+    }
   }
 });

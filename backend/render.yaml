@@ -3,15 +3,16 @@ services:
     name: truematch-backend
     env: node
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && npm run prisma:migrate:deploy
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
       - key: PORT
         value: 5000
       - key: FRONTEND_ORIGIN
-        value: https://super-duper-acorn-pjvvgrw9j9rph67wp-5173.app.github.dev
+        value: https://truematch.netlify.app
       - key: DATABASE_URL
         value: postgresql://postgres.hpglxumzlspykverdbby:qs%3Fpcvc7BB5%2B9eP@aws-1-eu-west-1.pooler.supabase.com:5432/postgres?sslmode=require
       - key: JWT_ACCESS_SECRET
