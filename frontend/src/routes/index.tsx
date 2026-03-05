@@ -91,14 +91,10 @@ const AdminRoute = () => {
 };
 
 const HomeRoute = () => {
-  const { isAuthenticated, isBootstrapping } = useAuth();
+  const { isBootstrapping } = useAuth();
 
   if (isBootstrapping) {
     return <LoadingSpinner className="min-h-screen" />;
-  }
-
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
   }
 
   return <HomePage />;
