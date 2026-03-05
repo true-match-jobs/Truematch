@@ -90,11 +90,25 @@ const AdminRoute = () => {
   return <Outlet />;
 };
 
+const HomeRoute = () => {
+  const { isAuthenticated, isBootstrapping } = useAuth();
+
+  if (isBootstrapping) {
+    return <LoadingSpinner className="min-h-screen" />;
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <HomePage />;
+};
+
 export const AppRoutes = () => {
   return (
     <Suspense fallback={<LoadingSpinner className="min-h-screen" />}>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/logo-generator" element={<LogoGeneratorPage />} />
         <Route path="/apply" element={<ApplyPage />} />
         <Route path="/login" element={<LoginPage />} />

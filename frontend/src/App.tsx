@@ -13,8 +13,11 @@ const App = () => {
 
   useEffect(() => {
     const handleSessionExpired = () => {
+      const { isAuthenticated } = useAuthStore.getState();
       useAuthStore.getState().clearSession();
-      navigate('/login', { replace: true });
+      if (isAuthenticated) {
+        navigate('/login', { replace: true });
+      }
     };
 
     window.addEventListener('auth:session-expired', handleSessionExpired);
