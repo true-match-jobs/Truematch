@@ -109,24 +109,41 @@ export const DashboardLayout = () => {
       return;
     }
 
-    const socket = chatService.createSocket();
+    let isCancelled = false;
+    let socket: WebSocket | null = null;
 
-    socket.onmessage = (event) => {
+    const connectSocket = async () => {
       try {
-        const payload = JSON.parse(event.data as string) as { type?: string };
+        socket = await chatService.createSocket();
 
-        if (payload.type !== 'notification' || pathname === '/dashboard/notifications') {
+        if (isCancelled) {
+          socket.close();
           return;
         }
 
-        setUnreadNotificationCount((currentCount) => currentCount + 1);
+        socket.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data as string) as { type?: string };
+
+            if (payload.type !== 'notification' || pathname === '/dashboard/notifications') {
+              return;
+            }
+
+            setUnreadNotificationCount((currentCount) => currentCount + 1);
+          } catch (_error) {
+            return;
+          }
+        };
       } catch (_error) {
         return;
       }
     };
 
+    void connectSocket();
+
     return () => {
-      socket.close();
+      isCancelled = true;
+      socket?.close();
     };
   }, [pathname, user?.role]);
 

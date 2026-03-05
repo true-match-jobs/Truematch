@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../../utils/app-error';
+import { signAccessToken } from '../../utils/jwt';
 import {
   downloadChatAttachmentFile,
   getAdminConversations,
@@ -9,6 +10,20 @@ import {
   resolveChatPeer,
   uploadChatAttachmentFile
 } from './chat.service';
+
+export const chatSocketTokenHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const token = signAccessToken({
+    userId: req.user.userId,
+    email: req.user.email,
+    role: req.user.role
+  });
+
+  res.status(200).json({ token });
+};
 
 export const chatPeerHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {

@@ -65,35 +65,52 @@ export const UserNotificationsPage = () => {
   }, []);
 
   useEffect(() => {
-    const socket = chatService.createSocket();
+    let isCancelled = false;
+    let socket: WebSocket | null = null;
 
-    socket.onmessage = (event) => {
+    const connectSocket = async () => {
       try {
-        const payload = JSON.parse(event.data as string) as {
-          type?: string;
-          notification?: NotificationItem;
-        };
+        socket = await chatService.createSocket();
 
-        if (payload.type !== 'notification' || !payload.notification) {
+        if (isCancelled) {
+          socket.close();
           return;
         }
 
-        const incomingNotification = payload.notification;
+        socket.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data as string) as {
+              type?: string;
+              notification?: NotificationItem;
+            };
 
-        setNotifications((currentNotifications) => {
-          if (currentNotifications.some((item) => item.id === incomingNotification.id)) {
-            return currentNotifications;
+            if (payload.type !== 'notification' || !payload.notification) {
+              return;
+            }
+
+            const incomingNotification = payload.notification;
+
+            setNotifications((currentNotifications) => {
+              if (currentNotifications.some((item) => item.id === incomingNotification.id)) {
+                return currentNotifications;
+              }
+
+              return [incomingNotification, ...currentNotifications];
+            });
+          } catch (_error) {
+            return;
           }
-
-          return [incomingNotification, ...currentNotifications];
-        });
+        };
       } catch (_error) {
         return;
       }
     };
 
+    void connectSocket();
+
     return () => {
-      socket.close();
+      isCancelled = true;
+      socket?.close();
     };
   }, []);
 

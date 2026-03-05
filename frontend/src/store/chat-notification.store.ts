@@ -147,7 +147,7 @@ const toUniqueIds = (ids: string[]): string[] => Array.from(new Set(ids));
 const buildAdminPlaceholderIds = (count: number): string[] =>
   Array.from({ length: count }, (_, index) => `__unread_${index}`);
 
-const setupSocket = (
+const setupSocket = async (
   set: (partial: Partial<ChatNotificationState> | ((state: ChatNotificationState) => Partial<ChatNotificationState>)) => void,
   get: () => ChatNotificationState
 ) => {
@@ -155,7 +155,28 @@ const setupSocket = (
     return;
   }
 
-  socket = chatService.createSocket();
+  const expectedUserId = connectedUserId;
+  const expectedUserRole = connectedUserRole;
+
+  let nextSocket: WebSocket;
+  try {
+    nextSocket = await chatService.createSocket();
+  } catch (_error) {
+    return;
+  }
+
+  if (
+    connectionConsumers <= 0 ||
+    !connectedUserId ||
+    !connectedUserRole ||
+    connectedUserId !== expectedUserId ||
+    connectedUserRole !== expectedUserRole
+  ) {
+    nextSocket.close();
+    return;
+  }
+
+  socket = nextSocket;
 
   socket.onopen = () => {
     sendPresenceSubscription();
@@ -262,7 +283,7 @@ const setupSocket = (
       }
 
       if (connectionConsumers > 0 && connectedUserId && connectedUserRole && !socket) {
-        setupSocket(set, get);
+        void setupSocket(set, get);
       }
     }, 1200);
   };
@@ -298,7 +319,7 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
 
     connectedUserId = user.id;
     connectedUserRole = user.role;
-    setupSocket(set, get);
+    void setupSocket(set, get);
     void get().hydrateUnreadSummary();
   },
 

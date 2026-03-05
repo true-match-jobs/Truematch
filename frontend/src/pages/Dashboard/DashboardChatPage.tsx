@@ -297,87 +297,108 @@ export const DashboardChatPage = () => {
       return;
     }
 
-    const socket = chatService.createSocket();
-    socketRef.current = socket;
+    let isCancelled = false;
+    let currentSocket: WebSocket | null = null;
 
-    socket.onopen = () => {
-      setIsSocketReady(true);
-    };
-
-    socket.onclose = () => {
-      setIsSocketReady(false);
-    };
-
-    socket.onerror = () => {
-      setIsSocketReady(false);
-    };
-
-    socket.onmessage = (event) => {
+    const connectSocket = async () => {
       try {
-        const payload = JSON.parse(event.data as string) as
-          | (ChatMessage & { type?: string })
-          | { type: 'typing'; fromUserId: string; toUserId: string; isTyping: boolean };
+        const socket = await chatService.createSocket();
 
-        if (
-          payload.type === 'typing' &&
-          'fromUserId' in payload &&
-          'toUserId' in payload &&
-          'isTyping' in payload &&
-          typeof payload.fromUserId === 'string' &&
-          typeof payload.toUserId === 'string' &&
-          typeof payload.isTyping === 'boolean'
-        ) {
-          const participants = [payload.fromUserId, payload.toUserId];
+        if (isCancelled) {
+          socket.close();
+          return;
+        }
 
-          if (!participants.includes(user.id) || !participants.includes(peer.id) || payload.fromUserId !== peer.id) {
+        currentSocket = socket;
+        socketRef.current = socket;
+
+        socket.onopen = () => {
+          setIsSocketReady(true);
+        };
+
+        socket.onclose = () => {
+          setIsSocketReady(false);
+        };
+
+        socket.onerror = () => {
+          setIsSocketReady(false);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data as string) as
+              | (ChatMessage & { type?: string })
+              | { type: 'typing'; fromUserId: string; toUserId: string; isTyping: boolean };
+
+            if (
+              payload.type === 'typing' &&
+              'fromUserId' in payload &&
+              'toUserId' in payload &&
+              'isTyping' in payload &&
+              typeof payload.fromUserId === 'string' &&
+              typeof payload.toUserId === 'string' &&
+              typeof payload.isTyping === 'boolean'
+            ) {
+              const participants = [payload.fromUserId, payload.toUserId];
+
+              if (!participants.includes(user.id) || !participants.includes(peer.id) || payload.fromUserId !== peer.id) {
+                return;
+              }
+
+              if (!payload.isTyping) {
+                setIsPeerTyping(false);
+                clearPeerTypingTimeout();
+                return;
+              }
+
+              setIsPeerTyping(true);
+              clearPeerTypingTimeout();
+              peerTypingTimeoutRef.current = window.setTimeout(() => {
+                setIsPeerTyping(false);
+                peerTypingTimeoutRef.current = null;
+              }, 3000);
+              return;
+            }
+
+            if (payload.type !== 'private_message') {
+              return;
+            }
+
+            const participants = [payload.fromUserId, payload.toUserId];
+
+            if (!participants.includes(user.id) || !participants.includes(peer.id)) {
+              return;
+            }
+
+            setMessages((current) => {
+              if (current.some((item) => item.id === payload.id)) {
+                return current;
+              }
+
+              return [...current, payload];
+            });
+
+            if (payload.fromUserId === peer.id) {
+              setIsPeerTyping(false);
+              clearPeerTypingTimeout();
+            }
+          } catch (_error) {
             return;
           }
-
-          if (!payload.isTyping) {
-            setIsPeerTyping(false);
-            clearPeerTypingTimeout();
-            return;
-          }
-
-          setIsPeerTyping(true);
-          clearPeerTypingTimeout();
-          peerTypingTimeoutRef.current = window.setTimeout(() => {
-            setIsPeerTyping(false);
-            peerTypingTimeoutRef.current = null;
-          }, 3000);
-          return;
-        }
-
-        if (payload.type !== 'private_message') {
-          return;
-        }
-
-        const participants = [payload.fromUserId, payload.toUserId];
-
-        if (!participants.includes(user.id) || !participants.includes(peer.id)) {
-          return;
-        }
-
-        setMessages((current) => {
-          if (current.some((item) => item.id === payload.id)) {
-            return current;
-          }
-
-          return [...current, payload];
-        });
-
-        if (payload.fromUserId === peer.id) {
-          setIsPeerTyping(false);
-          clearPeerTypingTimeout();
-        }
+        };
       } catch (_error) {
-        return;
+        if (!isCancelled) {
+          setIsSocketReady(false);
+        }
       }
     };
 
+    void connectSocket();
+
     return () => {
+      isCancelled = true;
       stopTyping();
-      socket.close();
+      currentSocket?.close();
       socketRef.current = null;
       setIsSocketReady(false);
       setIsPeerTyping(false);

@@ -3,6 +3,7 @@ import { authMiddleware, requireAdmin } from '../../middleware/auth.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 import {
 	adminConversationsHandler,
+	chatSocketTokenHandler,
 	chatPeerHandler,
 	conversationMessagesHandler,
 	downloadChatAttachmentHandler,
@@ -14,6 +15,7 @@ import { uploadChatAttachment } from './chat.upload';
 
 export const chatRouter = Router();
 
+chatRouter.get('/socket-token', authMiddleware, asyncHandler(chatSocketTokenHandler));
 chatRouter.get('/peer', authMiddleware, asyncHandler(chatPeerHandler));
 chatRouter.get('/messages/:peerUserId', authMiddleware, asyncHandler(conversationMessagesHandler));
 chatRouter.get('/conversations', authMiddleware, requireAdmin, asyncHandler(adminConversationsHandler));

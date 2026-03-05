@@ -97,22 +97,6 @@ export const decodeAttachmentMessageContent = (
   }
 };
 
-const getAccessToken = (): string | null => {
-  if (typeof document === 'undefined') {
-    return null;
-  }
-
-  const cookies = document.cookie.split(';');
-  for (const cookie of cookies) {
-    const [key, value] = cookie.trim().split('=');
-    if (key === 'accessToken' && value) {
-      return decodeURIComponent(value);
-    }
-  }
-
-  return null;
-};
-
 const resolveWsUrl = (): string => {
   const wsUrl = import.meta.env.VITE_WS_BASE_URL ?? import.meta.env.VITE_WS_URL;
   if (wsUrl) return wsUrl;
@@ -129,6 +113,11 @@ const resolveWsUrl = (): string => {
   }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${protocol}//${window.location.host}/ws`;
+};
+
+const appendTokenQuery = (wsUrl: string, token: string): string => {
+  const separator = wsUrl.includes('?') ? '&' : '?';
+  return `${wsUrl}${separator}token=${encodeURIComponent(token)}`;
 };
 
 export const chatService = {
@@ -201,16 +190,14 @@ export const chatService = {
     window.URL.revokeObjectURL(blobUrl);
   },
 
-  createSocket(): WebSocket {
-    let wsUrl = resolveWsUrl();
-    
-    // For cross-origin WebSocket connections, append the token as a query parameter
-    // since browsers don't send cookies for WebSocket upgrades to different origins
-    const accessToken = getAccessToken();
-    if (accessToken && !wsUrl.includes('?')) {
-      wsUrl += `?token=${encodeURIComponent(accessToken)}`;
-    }
-    
-    return new WebSocket(wsUrl);
+  async getSocketToken(): Promise<string> {
+    const response = await api.get<{ token: string }>('/chat/socket-token');
+    return response.data.token;
+  },
+
+  async createSocket(): Promise<WebSocket> {
+    const wsUrl = resolveWsUrl();
+    const token = await this.getSocketToken();
+    return new WebSocket(appendTokenQuery(wsUrl, token));
   }
 };
