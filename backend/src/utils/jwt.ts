@@ -11,7 +11,7 @@ export type JwtPayload = {
 const baseCookieOptions = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  sameSite: 'none' as const,
   path: '/'
 };
 
@@ -51,23 +51,24 @@ export const verifyRefreshToken = (token: string): JwtPayload => {
 };
 
 export const setAuthCookies = (res: Response, accessToken: string, refreshToken: string): void => {
-  res.cookie('accessToken', accessToken, {
+  const cookieOptions = {
     ...baseCookieOptions,
     maxAge: parseExpiresToMs(env.ACCESS_TOKEN_EXPIRES_IN),
-    domain: env.COOKIE_DOMAIN
-  });
+    ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN })
+  };
+
+  res.cookie('accessToken', accessToken, cookieOptions);
 
   res.cookie('refreshToken', refreshToken, {
-    ...baseCookieOptions,
-    maxAge: parseExpiresToMs(env.REFRESH_TOKEN_EXPIRES_IN),
-    domain: env.COOKIE_DOMAIN
+    ...cookieOptions,
+    maxAge: parseExpiresToMs(env.REFRESH_TOKEN_EXPIRES_IN)
   });
 };
 
 export const clearAuthCookies = (res: Response): void => {
   const clearOptions = {
     ...baseCookieOptions,
-    domain: env.COOKIE_DOMAIN
+    ...(env.COOKIE_DOMAIN && { domain: env.COOKIE_DOMAIN })
   };
 
   res.clearCookie('accessToken', clearOptions);
