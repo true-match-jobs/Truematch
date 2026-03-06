@@ -196,7 +196,6 @@ export const AdminDashboardConversationsPage = () => {
               if (!conversations.length) {
                 return;
               }
-            setCachedAdminConversations(nextConversations);
 
               setDeleteErrorMessage(null);
               setIsSelectionMode(true);
