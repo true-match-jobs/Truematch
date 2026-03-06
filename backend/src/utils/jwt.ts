@@ -8,12 +8,18 @@ export type JwtPayload = {
   role: 'USER' | 'ADMIN';
 };
 
+const isLocalhostFrontendOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(
+  env.FRONTEND_ORIGIN.trim()
+);
+
+const shouldUseCrossSiteCookies = !isLocalhostFrontendOrigin;
+
 const baseCookieOptions = {
   httpOnly: true,
-  secure: env.NODE_ENV === 'production',
-  // Production frontend and API are on different origins, so auth cookies
-  // must use SameSite=None (with Secure) to be sent on XHR/fetch requests.
-  sameSite: env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
+  // Cloudflare frontend and Render API run on different origins in production.
+  // Always use cross-site cookie settings when frontend origin is not localhost.
+  secure: shouldUseCrossSiteCookies,
+  sameSite: shouldUseCrossSiteCookies ? ('none' as const) : ('lax' as const),
   path: '/'
 };
 
