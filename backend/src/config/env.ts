@@ -19,8 +19,11 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM_EMAIL: z.string().email().optional(),
   SMTP_FROM_NAME: z.string().optional(),
+  EMAIL_LOGO_URL: z.string().url().optional(),
   EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS: z.coerce.number().int().positive().default(720),
   EMAIL_VERIFICATION_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
+  PASSWORD_RESET_TOKEN_EXPIRES_MINUTES: z.coerce.number().int().positive().default(60),
+  PASSWORD_RESET_RESEND_COOLDOWN_SECONDS: z.coerce.number().int().positive().default(60),
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
   CLOUDINARY_API_KEY: z.string().min(1),
   CLOUDINARY_API_SECRET: z.string().min(1)

@@ -74,6 +74,7 @@ export const SeoHead = () => {
     ensureMeta('meta[property="og:description"]', 'property', 'og:description', metadata.description);
     ensureMeta('meta[property="og:url"]', 'property', 'og:url', canonicalUrl);
     ensureMeta('meta[property="og:image"]', 'property', 'og:image', imageUrl);
+    ensureMeta('meta[property="og:image:secure_url"]', 'property', 'og:image:secure_url', imageUrl);
     ensureMeta('meta[property="og:image:type"]', 'property', 'og:image:type', 'image/png');
     ensureMeta('meta[property="og:image:width"]', 'property', 'og:image:width', '1200');
     ensureMeta('meta[property="og:image:height"]', 'property', 'og:image:height', '630');
@@ -82,6 +83,7 @@ export const SeoHead = () => {
     ensureMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
     ensureMeta('meta[name="twitter:title"]', 'name', 'twitter:title', metadata.title);
     ensureMeta('meta[name="twitter:description"]', 'name', 'twitter:description', metadata.description);
+    ensureMeta('meta[name="twitter:url"]', 'name', 'twitter:url', canonicalUrl);
     ensureMeta('meta[name="twitter:image"]', 'name', 'twitter:image', imageUrl);
 
     ensureCanonical(canonicalUrl);

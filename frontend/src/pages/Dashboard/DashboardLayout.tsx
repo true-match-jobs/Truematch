@@ -236,7 +236,7 @@ export const DashboardLayout = () => {
           >
             <ChatCircle size={28} weight="regular" />
             {unreadMessageCount > 0 ? (
-              <span className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+              <span className="absolute right-2 top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                 {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
               </span>
             ) : null}
@@ -269,7 +269,7 @@ export const DashboardLayout = () => {
           >
             <Bell size={28} weight="regular" />
             {unreadNotificationCount > 0 ? (
-              <span className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+              <span className="absolute right-2 top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                 {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
               </span>
             ) : null}

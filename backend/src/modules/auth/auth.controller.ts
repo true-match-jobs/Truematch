@@ -1,8 +1,16 @@
 import type { Request, Response } from 'express';
 import { AppError } from '../../utils/app-error';
 import { clearAuthCookies, setAuthCookies } from '../../utils/jwt';
-import { login, refreshAuth, register, resendEmailVerification, verifyEmailAddress } from './auth.service';
-import { loginSchema, registerSchema } from './auth.validation';
+import {
+  login,
+  refreshAuth,
+  register,
+  requestPasswordReset,
+  resendEmailVerification,
+  resetPassword,
+  verifyEmailAddress
+} from './auth.service';
+import { forgotPasswordSchema, loginSchema, registerSchema, resetPasswordSchema } from './auth.validation';
 
 export const registerHandler = async (req: Request, res: Response): Promise<void> => {
   const dto = registerSchema.parse(req.body);
@@ -77,5 +85,25 @@ export const resendEmailVerificationHandler = async (req: Request, res: Response
 
   res.status(200).json({
     message: 'Verification email sent'
+  });
+};
+
+export const forgotPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+  const dto = forgotPasswordSchema.parse(req.body);
+
+  await requestPasswordReset(dto);
+
+  res.status(200).json({
+    message: 'If an account exists for this email, a password reset link has been sent.'
+  });
+};
+
+export const resetPasswordHandler = async (req: Request, res: Response): Promise<void> => {
+  const dto = resetPasswordSchema.parse(req.body);
+
+  await resetPassword(dto);
+
+  res.status(200).json({
+    message: 'Password updated successfully. You can now sign in with your new password.'
   });
 };

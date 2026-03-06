@@ -55,13 +55,19 @@ export const LoginPage = () => {
       <main className="mx-auto flex flex-1 w-full max-w-xl flex-col items-center justify-center px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
         <div className="w-full space-y-8 rounded-2xl border border-white/40 bg-transparent p-6 sm:p-10">
           <div className="space-y-2 text-left">
-            <h1 className="text-2xl font-bold text-white sm:text-3xl">Welcome back</h1>
+            <h1 className="text-2xl font-bold text-white sm:text-3xl">Sign in to your account</h1>
             <p className="text-sm text-zinc-400">Sign in to continue your application journey.</p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             <Input id="email" type="email" label="Email" placeholder="Enter your email address" error={errors.email?.message} {...register('email')} />
             <Input id="password" type="password" label="Password" placeholder="Enter your password" error={errors.password?.message} {...register('password')} />
+
+            <div className="-mt-1 text-right">
+              <Link to="/forgot-password" className="text-sm font-medium text-brand-400 transition-colors hover:text-brand-300">
+                Forgot password?
+              </Link>
+            </div>
 
             {errorMessage ? (
               <p className="rounded-lg bg-rose-500/10 px-4 py-2.5 text-center text-sm text-rose-400">

@@ -1,6 +1,6 @@
 import { api } from './api';
 
-export type NotificationMessageType = 'SYSTEM_MESSAGE' | 'ADMIN_MESSAGE';
+export type NotificationMessageType = 'SYSTEM_MESSAGE';
 
 export type NotificationSender = {
   id: string;

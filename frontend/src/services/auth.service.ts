@@ -12,6 +12,11 @@ export type LoginPayload = {
   password: string;
 };
 
+export type ResetPasswordPayload = {
+  token: string;
+  password: string;
+};
+
 export type UpdateProfilePayload = Partial<{
   fullName: string;
   gender: string;
@@ -104,6 +109,16 @@ export const authService = {
 
   async resendEmailVerification(): Promise<string> {
     const response = await api.post<{ message: string }>('/auth/email-verification/resend');
+    return response.data.message;
+  },
+
+  async requestPasswordReset(email: string): Promise<string> {
+    const response = await api.post<{ message: string }>('/auth/forgot-password', { email });
+    return response.data.message;
+  },
+
+  async resetPassword(payload: ResetPasswordPayload): Promise<string> {
+    const response = await api.post<{ message: string }>('/auth/reset-password', payload);
     return response.data.message;
   }
 };

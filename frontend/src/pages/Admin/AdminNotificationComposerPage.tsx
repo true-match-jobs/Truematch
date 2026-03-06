@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Footer } from '../../components/layout/Footer';
 import { Navbar } from '../../components/layout/Navbar';
+import { Breadcrumbs } from '../../components/ui/Breadcrumbs';
 import { Snackbar } from '../../components/ui/Snackbar';
 import { SNACKBAR_AUTO_DISMISS_DELAY_MS } from '../../constants/snackbar';
 import { adminUserService } from '../../services/admin-user.service';
@@ -83,7 +84,7 @@ export const AdminNotificationComposerPage = () => {
       return 'Loading recipient details...';
     }
 
-    return `Send a direct notification to ${recipientName}.`;
+    return `Send a system notification to ${recipientName}.`;
   }, [isLoadingRecipient, recipientName]);
 
   const handleSend = async () => {
@@ -108,39 +109,49 @@ export const AdminNotificationComposerPage = () => {
     <div className="flex min-h-screen flex-col bg-dark-bg">
       <Navbar />
 
-      <main className="mx-auto flex flex-1 w-full max-w-xl flex-col items-center justify-center px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
-        <div className="w-full space-y-8 rounded-2xl border border-white/40 bg-transparent p-6 sm:p-10">
-          <div className="space-y-2 text-left">
-            <h1 className="text-2xl font-bold text-white sm:text-3xl">Notification Composer</h1>
-            <p className="text-sm text-zinc-400">{helperText}</p>
-          </div>
+      <main className="flex-1 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl">
+          <Breadcrumbs
+            items={[
+              { label: 'Dashboard', href: '/admin/dashboard' },
+              { label: 'Users', href: '/admin/dashboard/users' },
+              { label: 'Notification Composer' }
+            ]}
+          />
 
-          <div>
-            <label htmlFor="notification-message" className="text-sm font-medium text-zinc-200">
-              Message
-            </label>
-            <textarea
-              id="notification-message"
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              rows={6}
-              placeholder="Type your notification message..."
-              className="mt-2 w-full rounded-lg border border-white/40 bg-transparent px-3 py-2 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-500 focus:border-brand-500"
-              disabled={isSending || isLoadingRecipient || Boolean(errorMessage && errorMessage.includes('Recipient user was not found'))}
-            />
-          </div>
+          <div className="mt-4 w-full max-w-xl space-y-8 rounded-2xl border border-white/40 bg-transparent p-6 sm:p-10">
+            <div className="space-y-2 text-left">
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">Notification Composer</h1>
+              <p className="text-sm text-zinc-400">{helperText}</p>
+            </div>
 
-          {errorMessage ? <p className="mt-3 text-sm text-rose-400">{errorMessage}</p> : null}
+            <div>
+              <label htmlFor="notification-message" className="text-sm font-medium text-zinc-200">
+                Message
+              </label>
+              <textarea
+                id="notification-message"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                rows={6}
+                placeholder="Type your notification message..."
+                className="mt-2 w-full rounded-lg border border-white/40 bg-transparent px-3 py-2 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-500 focus:border-brand-500"
+                disabled={isSending || isLoadingRecipient || Boolean(errorMessage && errorMessage.includes('Recipient user was not found'))}
+              />
+            </div>
 
-          <div>
-            <button
-              type="button"
-              onClick={() => void handleSend()}
-              disabled={isSending || isLoadingRecipient || !message.trim() || Boolean(errorMessage && errorMessage.includes('Recipient user was not found'))}
-              className="w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSending ? 'Sending...' : 'Send'}
-            </button>
+            {errorMessage ? <p className="mt-3 text-sm text-rose-400">{errorMessage}</p> : null}
+
+            <div>
+              <button
+                type="button"
+                onClick={() => void handleSend()}
+                disabled={isSending || isLoadingRecipient || !message.trim() || Boolean(errorMessage && errorMessage.includes('Recipient user was not found'))}
+                className="w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSending ? 'Sending...' : 'Send'}
+              </button>
+            </div>
           </div>
         </div>
       </main>

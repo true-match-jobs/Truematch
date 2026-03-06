@@ -30,7 +30,9 @@ const EmploymentApplicationPage = lazy(() =>
   import('../pages/Application/EmploymentApplicationPage').then((module) => ({ default: module.EmploymentApplicationPage }))
 );
 const DashboardChatPage = lazy(() => import('../pages/Dashboard/DashboardChatPage').then((module) => ({ default: module.DashboardChatPage })));
+const ForgotPasswordPage = lazy(() => import('../pages/Auth/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })));
 const LoginPage = lazy(() => import('../pages/Auth/LoginPage').then((module) => ({ default: module.LoginPage })));
+const ResetPasswordPage = lazy(() => import('../pages/Auth/ResetPasswordPage').then((module) => ({ default: module.ResetPasswordPage })));
 const VerifyEmailPage = lazy(() => import('../pages/Auth/VerifyEmailPage').then((module) => ({ default: module.VerifyEmailPage })));
 const DashboardApplicationsPage = lazy(() =>
   import('../pages/Dashboard/DashboardApplicationsPage').then((module) => ({ default: module.DashboardApplicationsPage }))
@@ -108,6 +110,8 @@ export const AppRoutes = () => {
         <Route path="/logo-generator" element={<LogoGeneratorPage />} />
         <Route path="/apply" element={<ApplyPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/verify-email" element={<VerifyEmailPage />} />
 
         <Route element={<ProtectedRoute />}>

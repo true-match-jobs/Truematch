@@ -6,9 +6,18 @@ import { AppError } from '../../utils/app-error';
 import { sendEmail } from '../../utils/email';
 import { comparePassword, hashPassword } from '../../utils/hash';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../../utils/jwt';
-import type { LoginDto, RegisterDto } from './auth.validation';
+import type { ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordDto } from './auth.validation';
 
-type SanitizedUser = Omit<User, 'password'>;
+type SensitiveUserFields =
+  | 'password'
+  | 'emailVerificationTokenHash'
+  | 'emailVerificationTokenExpiresAt'
+  | 'emailVerificationLastSentAt'
+  | 'passwordResetTokenHash'
+  | 'passwordResetTokenExpiresAt'
+  | 'passwordResetLastSentAt';
+
+type SanitizedUser = Omit<User, SensitiveUserFields>;
 
 type AuthResponse = {
   user: SanitizedUser;
@@ -17,45 +26,226 @@ type AuthResponse = {
 };
 
 const sanitizeUser = (user: User): SanitizedUser => {
-  const { password: _password, ...safeUser } = user;
+  const {
+    password: _password,
+    emailVerificationTokenHash: _emailVerificationTokenHash,
+    emailVerificationTokenExpiresAt: _emailVerificationTokenExpiresAt,
+    emailVerificationLastSentAt: _emailVerificationLastSentAt,
+    passwordResetTokenHash: _passwordResetTokenHash,
+    passwordResetTokenExpiresAt: _passwordResetTokenExpiresAt,
+    passwordResetLastSentAt: _passwordResetLastSentAt,
+    ...safeUser
+  } = user;
+
   return safeUser;
 };
 
+const getFrontendBaseUrl = () => {
+  return env.FRONTEND_ORIGIN.replace(/\/+$/, '').replace(/#\/?$/, '');
+};
+
 const buildEmailVerificationLink = (token: string) => {
-  const baseUrl = env.FRONTEND_ORIGIN.replace(/\/+$/, '');
+  const baseUrl = getFrontendBaseUrl();
   return `${baseUrl}/#/verify-email?token=${encodeURIComponent(token)}`;
 };
 
-const buildEmailVerificationHtml = (fullName: string, verificationLink: string, expiresInHours: number) => {
+const buildPasswordResetLink = (token: string) => {
+  const baseUrl = getFrontendBaseUrl();
+  return `${baseUrl}/#/reset-password?token=${encodeURIComponent(token)}`;
+};
+
+const escapeHtml = (value: string) => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+const formatExpiryForEmail = (expiresAt: Date) => {
+  const prettyDate = new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC'
+  }).format(expiresAt);
+
+  return `${prettyDate} UTC`;
+};
+
+type BrandedActionEmailOptions = {
+  preheader: string;
+  title: string;
+  greetingName: string;
+  body: string;
+  buttonLabel: string;
+  actionLink: string;
+  expiresAt: Date;
+};
+
+const buildBrandedActionEmailHtml = ({
+  preheader,
+  title,
+  greetingName,
+  body,
+  buttonLabel,
+  actionLink,
+  expiresAt
+}: BrandedActionEmailOptions) => {
+  const baseUrl = getFrontendBaseUrl();
+  const logoUrl = env.EMAIL_LOGO_URL?.trim() || `${baseUrl}/logos/logo-tm.png`;
+  const expiryText = formatExpiryForEmail(expiresAt);
+  const currentYear = new Date().getFullYear();
+  const safeFullName = escapeHtml(greetingName);
+  const safePreheader = escapeHtml(preheader);
+  const safeTitle = escapeHtml(title);
+  const safeBody = escapeHtml(body);
+  const safeButtonLabel = escapeHtml(buttonLabel);
+
   return `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827; max-width: 640px; margin: 0 auto;">
-      <h2 style="margin: 0 0 12px;">Verify your email address</h2>
-      <p style="margin: 0 0 12px;">Hi ${fullName},</p>
-      <p style="margin: 0 0 12px;">
-        Thanks for submitting your TrueMatch application. Please verify your email to secure your account and continue receiving important updates.
-      </p>
-      <p style="margin: 18px 0;">
-        <a href="${verificationLink}" style="background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 16px; border-radius: 6px; display: inline-block;">
-          Verify Email
-        </a>
-      </p>
-      <p style="margin: 0 0 10px; font-size: 14px; color: #4b5563;">
-        This link expires in ${expiresInHours} hour${expiresInHours === 1 ? '' : 's'}.
-      </p>
-      <p style="margin: 0; font-size: 13px; color: #6b7280; word-break: break-all;">${verificationLink}</p>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
+    <title>${safeTitle}</title>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #09090b; color: #fafafa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0; mso-hide: all;">
+      ${safePreheader}
     </div>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #09090b; padding: 24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 640px; background-color: #131316; border: 1px solid #27272a; border-radius: 12px; overflow: hidden;">
+            <tr>
+              <td align="center" style="padding: 20px 24px; border-bottom: 1px solid #27272a; background-color: #09090b; text-align: center;">
+                <img src="${logoUrl}" alt="" width="160" style="display: block; width: 160px; height: auto; border: 0; margin: 0 auto;" />
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 28px 24px;">
+                <h1 style="margin: 0 0 14px; color: #fafafa; font-size: 24px; line-height: 1.25; font-weight: 700;">
+                  ${safeTitle}
+                </h1>
+                <p style="margin: 0 0 12px; color: #d4d4d8; font-size: 15px; line-height: 1.6;">
+                  Hi ${safeFullName},
+                </p>
+                <p style="margin: 0 0 18px; color: #d4d4d8; font-size: 15px; line-height: 1.6;">
+                  ${safeBody}
+                </p>
+
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 0 0 18px;">
+                  <tr>
+                    <td align="center" style="border-radius: 8px; background-color: #7c3aed;">
+                      <a href="${actionLink}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 12px 20px; color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 600; line-height: 1; border-radius: 8px;">
+                        ${safeButtonLabel}
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <p style="margin: 0 0 10px; color: #a1a1aa; font-size: 13px; line-height: 1.6;">
+                  This link expires on <strong style="color: #fafafa;">${expiryText}</strong>.
+                </p>
+
+                <p style="margin: 0 0 8px; color: #a1a1aa; font-size: 13px; line-height: 1.6;">
+                  If the button does not work, copy and paste this link into your browser:
+                </p>
+                <p style="margin: 0; font-size: 13px; line-height: 1.6; word-break: break-all;">
+                  <a href="${actionLink}" target="_blank" rel="noopener noreferrer" style="color: #a78bfa; text-decoration: underline;">${actionLink}</a>
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding: 16px 24px 20px; border-top: 1px solid #27272a; background-color: #09090b;">
+                <p style="margin: 0 0 6px; text-align: center; color: #a1a1aa; font-size: 12px; line-height: 1.5;">
+                  © ${currentYear} TrueMatch
+                </p>
+                <p style="margin: 0; text-align: center; color: #a1a1aa; font-size: 12px; line-height: 1.5;">
+                  Contact: <a href="mailto:support@truematch.chat" style="color: #a78bfa; text-decoration: underline;">support@truematch.chat</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
   `;
 };
 
-const buildEmailVerificationText = (fullName: string, verificationLink: string, expiresInHours: number) => {
-  return `Hi ${fullName},\n\nThanks for submitting your TrueMatch application. Please verify your email to secure your account and continue receiving important updates.\n\nVerify your email: ${verificationLink}\n\nThis link expires in ${expiresInHours} hour${expiresInHours === 1 ? '' : 's'}.`;
+const buildBrandedActionEmailText = ({
+  greetingName,
+  body,
+  buttonLabel,
+  actionLink,
+  expiresAt
+}: BrandedActionEmailOptions) => {
+  const expiryText = formatExpiryForEmail(expiresAt);
+
+  return `Hi ${greetingName},\n\n${body}\n\n${buttonLabel}: ${actionLink}\n\nThis link expires on ${expiryText}.\n\nNeed help? Contact support@truematch.chat`;
 };
 
-const hashEmailVerificationToken = (token: string) => {
+const buildEmailVerificationHtml = (fullName: string, verificationLink: string, expiresAt: Date) => {
+  return buildBrandedActionEmailHtml({
+    preheader: 'Verify your TrueMatch email address to secure your account.',
+    title: 'Verify your email address',
+    greetingName: fullName,
+    body: 'Thanks for submitting your TrueMatch application. Please verify your email to protect your account and continue receiving application updates.',
+    buttonLabel: 'Verify Email',
+    actionLink: verificationLink,
+    expiresAt
+  });
+};
+
+const buildEmailVerificationText = (fullName: string, verificationLink: string, expiresAt: Date) => {
+  return buildBrandedActionEmailText({
+    preheader: 'Verify your TrueMatch email address to secure your account.',
+    title: 'Verify your email address',
+    greetingName: fullName,
+    body: 'Thanks for submitting your TrueMatch application. Please verify your email to protect your account and continue receiving application updates.',
+    buttonLabel: 'Verify Email',
+    actionLink: verificationLink,
+    expiresAt
+  });
+};
+
+const buildPasswordResetHtml = (fullName: string, resetLink: string, expiresAt: Date) => {
+  return buildBrandedActionEmailHtml({
+    preheader: 'Use this secure link to reset your TrueMatch password.',
+    title: 'Reset your password',
+    greetingName: fullName,
+    body: 'We received a request to reset your TrueMatch password. Use the button below to create a new password. If you did not request this, you can safely ignore this email.',
+    buttonLabel: 'Reset Password',
+    actionLink: resetLink,
+    expiresAt
+  });
+};
+
+const buildPasswordResetText = (fullName: string, resetLink: string, expiresAt: Date) => {
+  return buildBrandedActionEmailText({
+    preheader: 'Use this secure link to reset your TrueMatch password.',
+    title: 'Reset your password',
+    greetingName: fullName,
+    body: 'We received a request to reset your TrueMatch password. Use this link to create a new password. If you did not request this, you can safely ignore this email.',
+    buttonLabel: 'Reset Password',
+    actionLink: resetLink,
+    expiresAt
+  });
+};
+
+const hashToken = (token: string) => {
   return createHash('sha256').update(token).digest('hex');
 };
 
-const createEmailVerificationToken = () => {
+const createSecureToken = () => {
   return randomBytes(32).toString('hex');
 };
 
@@ -89,8 +279,8 @@ export const sendEmailVerification = async (userId: string): Promise<void> => {
     throw new AppError(429, `Please wait ${resendCooldownSeconds} seconds before requesting another verification email`);
   }
 
-  const rawToken = createEmailVerificationToken();
-  const tokenHash = hashEmailVerificationToken(rawToken);
+  const rawToken = createSecureToken();
+  const tokenHash = hashToken(rawToken);
   const expiresInHours = env.EMAIL_VERIFICATION_TOKEN_EXPIRES_HOURS;
   const tokenExpiresAt = new Date(now + expiresInHours * 60 * 60 * 1000);
 
@@ -108,13 +298,13 @@ export const sendEmailVerification = async (userId: string): Promise<void> => {
   await sendEmail({
     to: user.email,
     subject: 'Verify your email address — TrueMatch',
-    html: buildEmailVerificationHtml(user.fullName, verificationLink, expiresInHours),
-    text: buildEmailVerificationText(user.fullName, verificationLink, expiresInHours)
+    html: buildEmailVerificationHtml(user.fullName, verificationLink, tokenExpiresAt),
+    text: buildEmailVerificationText(user.fullName, verificationLink, tokenExpiresAt)
   });
 };
 
 export const verifyEmailAddress = async (token: string): Promise<void> => {
-  const tokenHash = hashEmailVerificationToken(token);
+  const tokenHash = hashToken(token);
 
   const user = await prisma.user.findFirst({
     where: {
@@ -249,4 +439,81 @@ export const refreshAuth = async (refreshToken: string): Promise<AuthResponse> =
 
 export const resendEmailVerification = async (userId: string): Promise<void> => {
   await sendEmailVerification(userId);
+};
+
+export const requestPasswordReset = async (payload: ForgotPasswordDto): Promise<void> => {
+  const user = await prisma.user.findUnique({
+    where: { email: payload.email },
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      passwordResetLastSentAt: true
+    }
+  });
+
+  if (!user) {
+    return;
+  }
+
+  const now = Date.now();
+  const cooldownSeconds = env.PASSWORD_RESET_RESEND_COOLDOWN_SECONDS;
+
+  if (user.passwordResetLastSentAt && now - user.passwordResetLastSentAt.getTime() < cooldownSeconds * 1000) {
+    return;
+  }
+
+  const rawToken = createSecureToken();
+  const tokenHash = hashToken(rawToken);
+  const tokenExpiresAt = new Date(now + env.PASSWORD_RESET_TOKEN_EXPIRES_MINUTES * 60 * 1000);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetTokenHash: tokenHash,
+      passwordResetTokenExpiresAt: tokenExpiresAt,
+      passwordResetLastSentAt: new Date(now)
+    }
+  });
+
+  const resetLink = buildPasswordResetLink(rawToken);
+
+  await sendEmail({
+    to: user.email,
+    subject: 'Reset your password — TrueMatch',
+    html: buildPasswordResetHtml(user.fullName, resetLink, tokenExpiresAt),
+    text: buildPasswordResetText(user.fullName, resetLink, tokenExpiresAt)
+  });
+};
+
+export const resetPassword = async (payload: ResetPasswordDto): Promise<void> => {
+  const tokenHash = hashToken(payload.token);
+
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetTokenHash: tokenHash,
+      passwordResetTokenExpiresAt: {
+        gt: new Date()
+      }
+    },
+    select: {
+      id: true
+    }
+  });
+
+  if (!user) {
+    throw new AppError(400, 'Invalid or expired password reset link');
+  }
+
+  const hashedPassword = await hashPassword(payload.password);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashedPassword,
+      passwordResetTokenHash: null,
+      passwordResetTokenExpiresAt: null,
+      passwordResetLastSentAt: null
+    }
+  });
 };

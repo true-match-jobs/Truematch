@@ -82,7 +82,7 @@ export const AdminDashboardLayout = () => {
             >
               <ChatCircle size={28} weight="regular" />
               {unreadAdminUserIds.length > 0 ? (
-                <span className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+                <span className="absolute right-2 top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                   {unreadAdminUserIds.length > 99 ? '99+' : unreadAdminUserIds.length}
                 </span>
               ) : null}

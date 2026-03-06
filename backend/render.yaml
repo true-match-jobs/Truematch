@@ -12,7 +12,7 @@ services:
       - key: PORT
         value: 5000
       - key: FRONTEND_ORIGIN
-        value: https://precious-valkyrie-0e8095.netlify.app
+        sync: false  # Set in Render dashboard (your production frontend domain)
       # SECURITY: Set these in Render Dashboard → Environment → Secret Files
       # Never commit actual secret values to version control
       - key: DATABASE_URL

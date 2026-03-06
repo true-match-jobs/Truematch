@@ -87,6 +87,26 @@ const verifyEmailMetadata: SeoMetadata = {
   keywords: 'email verification, applicant portal'
 };
 
+const forgotPasswordMetadata: SeoMetadata = {
+  title: 'Forgot Password | TrueMatch',
+  description: 'Request a secure password reset link for your TrueMatch account.',
+  robots: 'noindex, nofollow',
+  imagePath: '/social-preview.png',
+  type: 'website',
+  canonicalPath: '/forgot-password',
+  keywords: 'forgot password, password reset, account recovery'
+};
+
+const resetPasswordMetadata: SeoMetadata = {
+  title: 'Reset Password | TrueMatch',
+  description: 'Set a new password for your TrueMatch account using your secure reset link.',
+  robots: 'noindex, nofollow',
+  imagePath: '/social-preview.png',
+  type: 'website',
+  canonicalPath: '/reset-password',
+  keywords: 'reset password, account security, truematch login'
+};
+
 const privateMetadata = (title: string, canonicalPath: string): SeoMetadata => ({
   title,
   description: 'Private account area for application tracking and communication.',
@@ -114,6 +134,14 @@ export const resolveSeoMetadata = (pathname: string): SeoMetadata => {
 
   if (normalizedPath === '/verify-email') {
     return verifyEmailMetadata;
+  }
+
+  if (normalizedPath === '/forgot-password') {
+    return forgotPasswordMetadata;
+  }
+
+  if (normalizedPath === '/reset-password') {
+    return resetPasswordMetadata;
   }
 
   if (normalizedPath.startsWith('/dashboard')) {

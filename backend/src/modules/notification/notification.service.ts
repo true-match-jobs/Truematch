@@ -66,23 +66,32 @@ const mapNotification = (
       profilePhotoUrl: string | null;
     } | null;
   }
-): NotificationItem => ({
-  id: notification.id,
-  recipientUserId: notification.recipientUserId,
-  senderUserId: notification.senderUserId,
-  message: notification.message,
-  messageType: notification.messageType,
-  readAt: notification.readAt ? notification.readAt.toISOString() : null,
-  createdAt: notification.createdAt.toISOString(),
-  sender: notification.senderUser
-    ? {
-        id: notification.senderUser.id,
-        fullName: notification.senderUser.fullName,
-        email: notification.senderUser.email,
-        profilePhotoUrl: notification.senderUser.profilePhotoUrl
-      }
-    : null
-});
+): NotificationItem => {
+  // Treat legacy admin-authored notifications as system messages in API responses.
+  // This keeps historical records consistent with the current product behavior.
+  const normalizedMessageType = notification.messageType === 'ADMIN_MESSAGE' ? 'SYSTEM_MESSAGE' : notification.messageType;
+
+  return {
+    id: notification.id,
+    recipientUserId: notification.recipientUserId,
+    senderUserId: normalizedMessageType === 'SYSTEM_MESSAGE' ? null : notification.senderUserId,
+    message: notification.message,
+    messageType: normalizedMessageType,
+    readAt: notification.readAt ? notification.readAt.toISOString() : null,
+    createdAt: notification.createdAt.toISOString(),
+    sender:
+      normalizedMessageType === 'SYSTEM_MESSAGE'
+        ? null
+        : notification.senderUser
+          ? {
+              id: notification.senderUser.id,
+              fullName: notification.senderUser.fullName,
+              email: notification.senderUser.email,
+              profilePhotoUrl: notification.senderUser.profilePhotoUrl
+            }
+          : null
+  };
+};
 
 const REQUIRED_ACTION_WRITE_MAX_RETRIES = 3;
 
@@ -188,6 +197,8 @@ export const createNotification = async ({
   messageType
 }: CreateNotificationInput): Promise<NotificationItem> => {
   const sanitizedMessage = message.trim();
+  const normalizedMessageType = messageType === 'ADMIN_MESSAGE' ? 'SYSTEM_MESSAGE' : messageType;
+  const normalizedSenderUserId = normalizedMessageType === 'SYSTEM_MESSAGE' ? null : senderUserId ?? null;
 
   if (!sanitizedMessage) {
     throw new AppError(400, 'Notification message is required');
@@ -205,9 +216,9 @@ export const createNotification = async ({
     throw new AppError(404, 'Recipient user not found');
   }
 
-  if (senderUserId) {
+  if (normalizedSenderUserId) {
     const senderUser = await prisma.user.findUnique({
-      where: { id: senderUserId },
+      where: { id: normalizedSenderUserId },
       select: {
         id: true,
         role: true
@@ -218,8 +229,8 @@ export const createNotification = async ({
       throw new AppError(404, 'Sender user not found');
     }
 
-    if (messageType === 'ADMIN_MESSAGE' && senderUser.role !== 'ADMIN') {
-      throw new AppError(403, 'Only admins can send admin notifications');
+    if (senderUser.role !== 'ADMIN') {
+      throw new AppError(403, 'Only admins can send non-system notifications');
     }
   }
 
@@ -227,9 +238,9 @@ export const createNotification = async ({
     data: {
       id: randomUUID(),
       recipientUserId,
-      senderUserId: senderUserId ?? null,
+      senderUserId: normalizedSenderUserId,
       message: sanitizedMessage,
-      messageType
+      messageType: normalizedMessageType
     },
     include: {
       senderUser: {

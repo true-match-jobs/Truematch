@@ -63,7 +63,7 @@ export const VerifyEmailPage = () => {
       <Navbar />
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="flex flex-1 items-center">
-          <section className="glass-border w-full space-y-8 rounded-2xl bg-transparent p-6 sm:p-10" aria-live="polite">
+          <section className="w-full space-y-8 rounded-2xl border border-white/40 bg-transparent p-6 sm:p-10" aria-live="polite">
             <div className="space-y-2 text-left">
               <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Verify Your Email Address</h1>
               <p className="text-sm leading-relaxed text-zinc-300 sm:text-base">
@@ -72,7 +72,7 @@ export const VerifyEmailPage = () => {
               </p>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 sm:px-5">
+            <div className="rounded-xl border border-white/40 bg-transparent px-4 py-3.5 sm:px-5">
               <p
                 className={
                   state === 'success'

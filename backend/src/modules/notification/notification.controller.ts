@@ -53,9 +53,9 @@ export const sendNotificationToUserByAdminHandler = async (req: Request, res: Re
 
   const notification = await createNotification({
     recipientUserId,
-    senderUserId: req.user.userId,
+    senderUserId: null,
     message: rawMessage,
-    messageType: 'ADMIN_MESSAGE'
+    messageType: 'SYSTEM_MESSAGE'
   });
 
   pushNotificationToUser(recipientUserId, {

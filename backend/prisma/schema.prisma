@@ -42,6 +42,9 @@ model User {
   emailVerificationTokenHash String?
   emailVerificationTokenExpiresAt DateTime?
   emailVerificationLastSentAt DateTime?
+  passwordResetTokenHash String?
+  passwordResetTokenExpiresAt DateTime?
+  passwordResetLastSentAt DateTime?
   role      UserRole @default(USER)
   applications Application[]
   sentMessages ChatMessage[] @relation("SentMessages")
