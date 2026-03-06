@@ -15,10 +15,30 @@ import { errorMiddleware } from './middleware/error.middleware';
 
 export const app = express();
 
+const normalizeOrigin = (origin: string): string => origin.trim().replace(/\/+$/, '').toLowerCase();
+
+const allowedOrigins = env.FRONTEND_ORIGIN.split(',')
+  .map((origin) => normalizeOrigin(origin))
+  .filter((origin) => origin.length > 0);
+
 app.use(helmet());
 app.use(
   cors({
-    origin: env.FRONTEND_ORIGIN,
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedRequestOrigin = normalizeOrigin(requestOrigin);
+
+      if (allowedOrigins.includes(normalizedRequestOrigin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('CORS origin not allowed'));
+    },
     credentials: true
   })
 );
