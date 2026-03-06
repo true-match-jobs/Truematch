@@ -8,10 +8,34 @@ import { chatService, type AdminConversation } from '../../services/chat.service
 import { useChatNotificationStore } from '../../store/chat-notification.store';
 import { buildInitialAvatarUrl } from '../../utils/avatar';
 
+const ADMIN_CONVERSATIONS_CACHE_TTL_MS = 60_000;
+
+let adminConversationsCache: {
+  conversations: AdminConversation[];
+  cachedAt: number;
+} | null = null;
+
+const getCachedAdminConversations = (): AdminConversation[] | null => {
+  if (!adminConversationsCache) {
+    return null;
+  }
+
+  const isFresh = Date.now() - adminConversationsCache.cachedAt < ADMIN_CONVERSATIONS_CACHE_TTL_MS;
+
+  return isFresh ? adminConversationsCache.conversations : null;
+};
+
+const setCachedAdminConversations = (conversations: AdminConversation[]): void => {
+  adminConversationsCache = {
+    conversations,
+    cachedAt: Date.now()
+  };
+};
+
 export const AdminDashboardConversationsPage = () => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<AdminConversation[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [conversations, setConversations] = useState<AdminConversation[]>(() => getCachedAdminConversations() ?? []);
+  const [isLoading, setIsLoading] = useState(() => !getCachedAdminConversations());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedConversationUserIds, setSelectedConversationUserIds] = useState<string[]>([]);
@@ -55,6 +79,7 @@ export const AdminDashboardConversationsPage = () => {
           return;
         }
 
+        setCachedAdminConversations(nextConversations);
         setConversations(nextConversations);
         setSelectedConversationUserIds((currentSelectedIds) =>
           currentSelectedIds.filter((selectedId) =>
@@ -75,7 +100,7 @@ export const AdminDashboardConversationsPage = () => {
       }
     };
 
-    void loadConversations(true);
+    void loadConversations(!getCachedAdminConversations());
     const intervalId = window.setInterval(() => {
       void loadConversations(false);
     }, 5000);
@@ -130,11 +155,15 @@ export const AdminDashboardConversationsPage = () => {
       setDeleteErrorMessage(null);
       await chatService.clearAdminConversations(selectedConversationUserIds);
 
-      setConversations((currentConversations) =>
-        currentConversations.filter(
+      setConversations((currentConversations) => {
+        const nextConversations = currentConversations.filter(
           (conversation) => !selectedConversationUserIds.includes(conversation.user.id)
-        )
-      );
+        );
+
+        setCachedAdminConversations(nextConversations);
+
+        return nextConversations;
+      });
 
       setSelectedConversationUserIds([]);
       setIsDeleteModalOpen(false);
@@ -167,6 +196,7 @@ export const AdminDashboardConversationsPage = () => {
               if (!conversations.length) {
                 return;
               }
+            setCachedAdminConversations(nextConversations);
 
               setDeleteErrorMessage(null);
               setIsSelectionMode(true);

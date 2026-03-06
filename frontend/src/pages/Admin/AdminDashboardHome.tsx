@@ -4,9 +4,46 @@ import { Link } from 'react-router-dom';
 import { applicationService, type AdminApplicationListItem } from '../../services/application.service';
 import { adminUserService } from '../../services/admin-user.service';
 
+const ADMIN_HOME_CACHE_TTL_MS = 60_000;
+
+let adminHomeCache: {
+  applications: AdminApplicationListItem[];
+  totalUsers: number;
+  cachedAt: number;
+} | null = null;
+
+const getCachedAdminHomeData = (): {
+  applications: AdminApplicationListItem[];
+  totalUsers: number;
+} | null => {
+  if (!adminHomeCache) {
+    return null;
+  }
+
+  const isFresh = Date.now() - adminHomeCache.cachedAt < ADMIN_HOME_CACHE_TTL_MS;
+
+  if (!isFresh) {
+    return null;
+  }
+
+  return {
+    applications: adminHomeCache.applications,
+    totalUsers: adminHomeCache.totalUsers
+  };
+};
+
+const setCachedAdminHomeData = (applications: AdminApplicationListItem[], totalUsers: number): void => {
+  adminHomeCache = {
+    applications,
+    totalUsers,
+    cachedAt: Date.now()
+  };
+};
+
 export const AdminDashboardHome = () => {
-  const [applications, setApplications] = useState<AdminApplicationListItem[]>([]);
-  const [totalUsers, setTotalUsers] = useState(0);
+  const cachedData = getCachedAdminHomeData();
+  const [applications, setApplications] = useState<AdminApplicationListItem[]>(cachedData?.applications ?? []);
+  const [totalUsers, setTotalUsers] = useState(cachedData?.totalUsers ?? 0);
 
   useEffect(() => {
     let isCancelled = false;
@@ -22,6 +59,7 @@ export const AdminDashboardHome = () => {
           return;
         }
 
+        setCachedAdminHomeData(applicationsResult, usersResult.length);
         setApplications(applicationsResult);
         setTotalUsers(usersResult.length);
       } catch (_error) {

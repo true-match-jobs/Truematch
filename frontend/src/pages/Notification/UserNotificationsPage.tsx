@@ -11,10 +11,34 @@ import { chatService } from '../../services/chat.service';
 import { notificationService, type NotificationItem } from '../../services/notification.service';
 import { buildInitialAvatarUrl, buildSystemAvatarUrl } from '../../utils/avatar';
 
+const USER_NOTIFICATIONS_CACHE_TTL_MS = 60_000;
+
+let userNotificationsCache: {
+  notifications: NotificationItem[];
+  cachedAt: number;
+} | null = null;
+
+const getCachedUserNotifications = (): NotificationItem[] | null => {
+  if (!userNotificationsCache) {
+    return null;
+  }
+
+  const isFresh = Date.now() - userNotificationsCache.cachedAt < USER_NOTIFICATIONS_CACHE_TTL_MS;
+
+  return isFresh ? userNotificationsCache.notifications : null;
+};
+
+const setCachedUserNotifications = (notifications: NotificationItem[]): void => {
+  userNotificationsCache = {
+    notifications,
+    cachedAt: Date.now()
+  };
+};
+
 export const UserNotificationsPage = () => {
   const { user } = useAuth();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => getCachedUserNotifications() ?? []);
+  const [isLoading, setIsLoading] = useState(() => !getCachedUserNotifications());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
@@ -32,6 +56,7 @@ export const UserNotificationsPage = () => {
     try {
       await notificationService.clearAll();
       setNotifications([]);
+      setCachedUserNotifications([]);
       setErrorMessage(null);
       setIsClearModalOpen(false);
       setShowClearSuccessSnackbar(true);
@@ -50,8 +75,11 @@ export const UserNotificationsPage = () => {
   useEffect(() => {
     let isCancelled = false;
 
-    const loadNotifications = async () => {
-      setIsLoading(true);
+    const loadNotifications = async (showLoading = false) => {
+      if (showLoading) {
+        setIsLoading(true);
+      }
+
       setErrorMessage(null);
 
       try {
@@ -61,6 +89,7 @@ export const UserNotificationsPage = () => {
           return;
         }
 
+        setCachedUserNotifications(nextNotifications);
         setNotifications(nextNotifications);
       } catch (_error) {
         if (isCancelled) {
@@ -71,12 +100,14 @@ export const UserNotificationsPage = () => {
         setErrorMessage('Unable to load notifications right now.');
       } finally {
         if (!isCancelled) {
-          setIsLoading(false);
+          if (showLoading) {
+            setIsLoading(false);
+          }
         }
       }
     };
 
-    void loadNotifications();
+    void loadNotifications(!getCachedUserNotifications());
 
     return () => {
       isCancelled = true;
@@ -128,7 +159,10 @@ export const UserNotificationsPage = () => {
                 return currentNotifications;
               }
 
-              return [incomingNotification, ...currentNotifications];
+              const nextNotifications = [incomingNotification, ...currentNotifications];
+              setCachedUserNotifications(nextNotifications);
+
+              return nextNotifications;
             });
           } catch (_error) {
             return;

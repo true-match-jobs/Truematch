@@ -11,6 +11,30 @@ type UserConversationPreview = AdminConversation & {
   lastMessageFromUserId: string;
 };
 
+const USER_CONVERSATIONS_CACHE_TTL_MS = 60_000;
+
+let userConversationsCache: {
+  conversations: UserConversationPreview[];
+  cachedAt: number;
+} | null = null;
+
+const getCachedUserConversations = (): UserConversationPreview[] | null => {
+  if (!userConversationsCache) {
+    return null;
+  }
+
+  const isFresh = Date.now() - userConversationsCache.cachedAt < USER_CONVERSATIONS_CACHE_TTL_MS;
+
+  return isFresh ? userConversationsCache.conversations : null;
+};
+
+const setCachedUserConversations = (conversations: UserConversationPreview[]): void => {
+  userConversationsCache = {
+    conversations,
+    cachedAt: Date.now()
+  };
+};
+
 const formatLastMessagePreview = (content: string): string => {
   const decodedAttachment = decodeAttachmentMessageContent(content);
 
@@ -23,8 +47,8 @@ const formatLastMessagePreview = (content: string): string => {
 
 export const DashboardConversationsPage = () => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<UserConversationPreview[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [conversations, setConversations] = useState<UserConversationPreview[]>(() => getCachedUserConversations() ?? []);
+  const [isLoading, setIsLoading] = useState(() => !getCachedUserConversations());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const unreadUserMessageCount = useChatNotificationStore((state) => state.unreadUserMessageCount);
   const presenceByUserId = useChatNotificationStore((state) => state.presenceByUserId);
@@ -66,12 +90,13 @@ export const DashboardConversationsPage = () => {
         }
 
         if (!history.length) {
+          setCachedUserConversations([]);
           setConversations([]);
           return;
         }
 
         const lastMessage = history[history.length - 1];
-        setConversations([
+        const nextConversations: UserConversationPreview[] = [
           {
             user: peer,
             lastMessageAt: lastMessage.createdAt,
@@ -79,7 +104,10 @@ export const DashboardConversationsPage = () => {
             unreadMessageCount: unreadUserMessageCount,
             lastMessageFromUserId: lastMessage.fromUserId
           }
-        ]);
+        ];
+
+        setCachedUserConversations(nextConversations);
+        setConversations(nextConversations);
       } catch (_error) {
         if (isCancelled) {
           return;
@@ -94,7 +122,7 @@ export const DashboardConversationsPage = () => {
       }
     };
 
-    void loadConversations(true);
+    void loadConversations(!getCachedUserConversations());
     const intervalId = window.setInterval(() => {
       void loadConversations(false);
     }, 5000);
