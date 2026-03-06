@@ -24,13 +24,6 @@ type ApplicationSummaryCardProps = {
   onDeleteClick?: () => void;
 };
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  }).format(new Date(value));
-
 export const ApplicationSummaryCard = ({
   application,
   className = 'mt-4 max-w-2xl',
@@ -119,12 +112,10 @@ export const ApplicationSummaryCard = ({
             <span className="text-zinc-500">INTAKE:</span> <span className="text-zinc-200">{application.intake || 'N/A'}</span>
           </p>
         ) : null}
-        <p className="mt-2 text-sm font-medium">
-          <span className="text-zinc-500">CREATED:</span> <span className="text-zinc-200">{formatDate(application.createdAt)}</span>
-        </p>
+        <p className="mt-2 text-sm text-zinc-500">Submitted on {new Date(application.createdAt).toLocaleDateString()}</p>
 
         {showDeleteAction ? (
-          <div className="mt-3">
+          <div className="mt-3 flex justify-end">
             <button
               type="button"
               onClick={handleDeleteClick}

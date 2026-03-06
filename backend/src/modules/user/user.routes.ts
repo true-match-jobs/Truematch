@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.middleware';
 import { asyncHandler } from '../../utils/async-handler';
 import {
+	clearMyNotificationsHandler,
 	getMyNotificationsHandler,
 	markMyNotificationReadHandler,
 	getMyUnreadNotificationCountHandler,
@@ -22,6 +23,7 @@ userRouter.get('/me', authMiddleware, asyncHandler(meHandler));
 userRouter.get('/me/all', authMiddleware, asyncHandler(meAllDataHandler));
 userRouter.get('/me/notifications', authMiddleware, asyncHandler(getMyNotificationsHandler));
 userRouter.get('/me/notifications/unread-count', authMiddleware, asyncHandler(getMyUnreadNotificationCountHandler));
+userRouter.delete('/me/notifications', authMiddleware, asyncHandler(clearMyNotificationsHandler));
 userRouter.patch('/me/notifications/read-all', authMiddleware, asyncHandler(markMyNotificationsReadHandler));
 userRouter.patch('/me/notifications/:notificationId/read', authMiddleware, asyncHandler(markMyNotificationReadHandler));
 userRouter.patch('/me/profile', authMiddleware, asyncHandler(updateMeProfileHandler));

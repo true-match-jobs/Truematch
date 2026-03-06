@@ -175,7 +175,7 @@ export const DashboardConversationsPage = () => {
                     </div>
 
                     <div className="mt-0.5 flex items-center gap-2">
-                      <p className="min-w-0 flex-1 truncate text-xs text-zinc-400">{previewText}</p>
+                      <p className="min-w-0 flex-1 truncate text-sm text-zinc-300">{previewText}</p>
                       <RelativeTime value={conversation.lastMessageAt} className="shrink-0 text-xs text-zinc-400" />
                     </div>
                   </div>

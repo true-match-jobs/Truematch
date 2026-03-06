@@ -8,6 +8,7 @@ type WsInboundMessage = {
   type: 'private_message';
   toUserId: string;
   content: string;
+  clientId?: string;
 } | {
   type: 'presence_subscribe';
   userIds: string[];
@@ -23,7 +24,9 @@ type WsOutboundMessage = {
   fromUserId: string;
   toUserId: string;
   content: string;
+  isRead: boolean;
   createdAt: string;
+  clientId?: string;
 } | {
   type: 'presence_update';
   userId: string;
@@ -42,6 +45,12 @@ type WsOutboundMessage = {
 } | {
   type: 'notification';
   notification: NotificationItem;
+} | {
+  type: 'read_receipt';
+  readerUserId: string;
+  peerUserId: string;
+  messageIds: string[];
+  readAt: string;
 };
 
 const userConnections = new Map<string, Set<WebSocket>>();
@@ -182,6 +191,11 @@ export const pushNotificationToUser = (userId: string, payload: Extract<WsOutbou
   broadcastToUser(userId, payload);
 };
 
+export const pushReadReceiptToConversation = (payload: Extract<WsOutboundMessage, { type: 'read_receipt' }>): void => {
+  broadcastToUser(payload.readerUserId, payload);
+  broadcastToUser(payload.peerUserId, payload);
+};
+
 const sendPresenceSnapshot = (subscriberUserId: string): void => {
   const targets = presenceTargetsBySubscriber.get(subscriberUserId);
 
@@ -274,8 +288,13 @@ export const setupWebSocketServer = (server: import('http').Server): WebSocketSe
             fromUserId: persistedMessage.fromUserId,
             toUserId: persistedMessage.toUserId,
             content: persistedMessage.content,
+            isRead: persistedMessage.isRead,
             createdAt: persistedMessage.createdAt
           };
+
+          if (typeof data.clientId === 'string' && data.clientId.trim().length > 0) {
+            outboundMessage.clientId = data.clientId.trim();
+          }
 
           broadcastToUser(payload.userId, outboundMessage);
           broadcastToUser(data.toUserId, outboundMessage);

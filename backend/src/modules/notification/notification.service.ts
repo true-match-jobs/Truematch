@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { NotificationMessageType, UserRole } from '@prisma/client';
+import { Prisma, type NotificationMessageType, type UserRole } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/app-error';
 
@@ -83,6 +83,103 @@ const mapNotification = (
       }
     : null
 });
+
+const REQUIRED_ACTION_WRITE_MAX_RETRIES = 3;
+
+const ensureSingleSystemNotificationsForMessages = async (
+  userId: string,
+  candidateMessages: string[]
+): Promise<NotificationItem[]> => {
+  for (let attempt = 1; attempt <= REQUIRED_ACTION_WRITE_MAX_RETRIES; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const existingSystemNotifications = await tx.notification.findMany({
+            where: {
+              recipientUserId: userId,
+              messageType: 'SYSTEM_MESSAGE',
+              message: {
+                in: candidateMessages
+              }
+            },
+            select: {
+              id: true,
+              message: true,
+              createdAt: true
+            },
+            orderBy: {
+              createdAt: 'desc'
+            }
+          });
+
+          const seenMessages = new Set<string>();
+          const duplicateIds: string[] = [];
+
+          existingSystemNotifications.forEach((notification) => {
+            if (seenMessages.has(notification.message)) {
+              duplicateIds.push(notification.id);
+              return;
+            }
+
+            seenMessages.add(notification.message);
+          });
+
+          if (duplicateIds.length > 0) {
+            await tx.notification.deleteMany({
+              where: {
+                id: {
+                  in: duplicateIds
+                }
+              }
+            });
+          }
+
+          const messagesToCreate = candidateMessages.filter((message) => !seenMessages.has(message));
+
+          if (messagesToCreate.length === 0) {
+            return [];
+          }
+
+          const createdNotifications = await Promise.all(
+            messagesToCreate.map((message) =>
+              tx.notification.create({
+                data: {
+                  id: randomUUID(),
+                  recipientUserId: userId,
+                  senderUserId: null,
+                  message,
+                  messageType: 'SYSTEM_MESSAGE'
+                },
+                include: {
+                  senderUser: {
+                    select: {
+                      id: true,
+                      fullName: true,
+                      email: true,
+                      profilePhotoUrl: true
+                    }
+                  }
+                }
+              })
+            )
+          );
+
+          return createdNotifications.map((notification) => mapNotification(notification));
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+    } catch (error) {
+      const isRetryableSerializationError =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+
+      if (!isRetryableSerializationError || attempt === REQUIRED_ACTION_WRITE_MAX_RETRIES) {
+        throw error;
+      }
+    }
+  }
+
+  return [];
+};
 
 export const createNotification = async ({
   recipientUserId,
@@ -243,6 +340,20 @@ export const markNotificationRead = async (
   });
 };
 
+export const deleteAllUserNotifications = async (userId: string, userRole: UserRole): Promise<number> => {
+  if (userRole !== 'USER') {
+    throw new AppError(403, 'Only users can clear notifications');
+  }
+
+  const { count } = await prisma.notification.deleteMany({
+    where: {
+      recipientUserId: userId
+    }
+  });
+
+  return count;
+};
+
 export const ensureRequiredActionNotificationsForUser = async (userId: string): Promise<NotificationItem[]> => {
   const user = await prisma.user.findUnique({
     where: {
@@ -306,33 +417,5 @@ export const ensureRequiredActionNotificationsForUser = async (userId: string): 
     return [];
   }
 
-  const existingSystemNotifications = await prisma.notification.findMany({
-    where: {
-      recipientUserId: userId,
-      messageType: 'SYSTEM_MESSAGE',
-      message: {
-        in: candidateMessages
-      }
-    },
-    select: {
-      message: true
-    }
-  });
-
-  const existingMessages = new Set(existingSystemNotifications.map((notification) => notification.message));
-  const messagesToCreate = candidateMessages.filter((message) => !existingMessages.has(message));
-
-  if (messagesToCreate.length === 0) {
-    return [];
-  }
-
-  return Promise.all(
-    messagesToCreate.map((message) =>
-      createNotification({
-        recipientUserId: userId,
-        message,
-        messageType: 'SYSTEM_MESSAGE'
-      })
-    )
-  );
+  return ensureSingleSystemNotificationsForMessages(userId, candidateMessages);
 };

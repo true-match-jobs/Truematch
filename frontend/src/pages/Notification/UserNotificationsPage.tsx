@@ -1,8 +1,11 @@
+import { X } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import { SNACKBAR_AUTO_DISMISS_DELAY_MS } from '../../constants/snackbar';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { RelativeTime } from '../../components/ui/RelativeTime';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Snackbar } from '../../components/ui/Snackbar';
 import { useAuth } from '../../hooks/useAuth';
 import { chatService } from '../../services/chat.service';
 import { notificationService, type NotificationItem } from '../../services/notification.service';
@@ -14,11 +17,27 @@ export const UserNotificationsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isClearing, setIsClearing] = useState(false);
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [clearErrorMessage, setClearErrorMessage] = useState<string | null>(null);
+  const [showClearSuccessSnackbar, setShowClearSuccessSnackbar] = useState(false);
+
   const handleClearAll = async () => {
+    if (!notifications.length || isClearing) {
+      return;
+    }
+
     setIsClearing(true);
+    setClearErrorMessage(null);
+
     try {
-      await notificationService.markAllRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, readAt: n.readAt ?? new Date().toISOString() })));
+      await notificationService.clearAll();
+      setNotifications([]);
+      setErrorMessage(null);
+      setIsClearModalOpen(false);
+      setShowClearSuccessSnackbar(true);
+    } catch (_error) {
+      setErrorMessage('Unable to clear notifications right now.');
+      setClearErrorMessage('Unable to clear notifications right now.');
     } finally {
       setIsClearing(false);
     }
@@ -63,6 +82,20 @@ export const UserNotificationsPage = () => {
       isCancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!showClearSuccessSnackbar) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowClearSuccessSnackbar(false);
+    }, SNACKBAR_AUTO_DISMISS_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [showClearSuccessSnackbar]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -120,6 +153,17 @@ export const UserNotificationsPage = () => {
       <main className="flex-1 min-h-0 overflow-y-auto pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center justify-between px-3">
           <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Notifications</h2>
+          <button
+            type="button"
+            onClick={() => {
+              setClearErrorMessage(null);
+              setIsClearModalOpen(true);
+            }}
+            disabled={isLoading || isClearing || notifications.length === 0}
+            className="text-sm font-medium text-red-400 transition-colors hover:text-red-300 disabled:cursor-not-allowed disabled:text-zinc-500"
+          >
+            Clear all
+          </button>
         </div>
 
         {isLoading ? (
@@ -189,6 +233,71 @@ export const UserNotificationsPage = () => {
           </div>
         ) : null}
       </main>
+
+      {isClearModalOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="clear-notifications-title"
+          onClick={() => {
+            if (!isClearing) {
+              setIsClearModalOpen(false);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-xl border border-white/10 bg-dark-card p-5 shadow-lg sm:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <h3 id="clear-notifications-title" className="text-base font-semibold text-zinc-100">
+                Clear notifications?
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(false)}
+                disabled={isClearing}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-400 transition-colors hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:cursor-not-allowed"
+                aria-label="Close clear notifications confirmation"
+              >
+                <X size={14} weight="bold" />
+              </button>
+            </div>
+
+            <p className="mt-3 text-sm text-zinc-300">
+              Are you sure you want to clear all notifications? This action cannot be undone.
+            </p>
+
+            {clearErrorMessage ? <p className="mt-3 text-sm text-rose-400">{clearErrorMessage}</p> : null}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsClearModalOpen(false)}
+                disabled={isClearing}
+                className="rounded-md border border-white/10 px-3 py-2 text-sm font-medium text-zinc-200 transition-colors hover:border-white/20 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearAll()}
+                disabled={isClearing}
+                className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed"
+              >
+                {isClearing ? 'Clearing...' : 'Clear all'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <Snackbar
+        message="Notifications cleared successfully"
+        visible={showClearSuccessSnackbar}
+        position="bottom-center"
+      />
     </div>
   );
 };

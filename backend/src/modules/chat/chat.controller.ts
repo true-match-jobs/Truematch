@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { AppError } from '../../utils/app-error';
 import { signAccessToken } from '../../utils/jwt';
 import {
+  clearAdminConversationList,
   downloadChatAttachmentFile,
   getAdminConversations,
   getConversationMessages,
@@ -10,6 +11,7 @@ import {
   resolveChatPeer,
   uploadChatAttachmentFile
 } from './chat.service';
+import { pushReadReceiptToConversation } from './websocket';
 
 export const chatSocketTokenHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
@@ -67,6 +69,39 @@ export const adminConversationsHandler = async (req: Request, res: Response): Pr
   res.status(200).json({ conversations });
 };
 
+export const clearAdminConversationsHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  if (req.user.role !== 'ADMIN') {
+    throw new AppError(403, 'Forbidden');
+  }
+
+  const rawUserIds = req.body?.userIds;
+
+  if (!Array.isArray(rawUserIds) || rawUserIds.length === 0) {
+    throw new AppError(400, 'At least one user id is required');
+  }
+
+  const userIds = Array.from(
+    new Set(
+      rawUserIds
+        .filter((value: unknown): value is string => typeof value === 'string')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    )
+  );
+
+  if (!userIds.length) {
+    throw new AppError(400, 'At least one valid user id is required');
+  }
+
+  await clearAdminConversationList(req.user.userId, userIds);
+
+  res.status(200).json({ message: 'Conversations cleared from admin list' });
+};
+
 export const unreadSummaryHandler = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     throw new AppError(401, 'Unauthorized');
@@ -90,7 +125,17 @@ export const markConversationReadHandler = async (req: Request, res: Response): 
   }
 
   await resolveChatPeer(req.user.userId, req.user.role, peerUserId);
-  await markConversationRead(req.user.userId, peerUserId);
+  const readMessageIds = await markConversationRead(req.user.userId, peerUserId);
+
+  if (readMessageIds.length) {
+    pushReadReceiptToConversation({
+      type: 'read_receipt',
+      readerUserId: req.user.userId,
+      peerUserId,
+      messageIds: readMessageIds,
+      readAt: new Date().toISOString()
+    });
+  }
 
   res.status(200).json({ message: 'Conversation marked as read' });
 };

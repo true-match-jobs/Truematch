@@ -1,4 +1,4 @@
-import { FilePdf, PaperPlaneTilt, Paperclip, X } from '@phosphor-icons/react';
+import { Check, Checks, Clock, FilePdf, PaperPlaneTilt, Paperclip, X } from '@phosphor-icons/react';
 import { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,7 +21,7 @@ const CHAT_PAGE_CACHE_TTL_MS = 45_000;
 
 type ConversationCacheEntry = {
   peer: ChatUser;
-  messages: ChatMessage[];
+  messages: ChatUiMessage[];
   cachedAt: number;
 };
 
@@ -34,6 +34,31 @@ type PendingComposerAttachment = {
   localUrl: string;
 };
 
+type ChatUiMessage = ChatMessage & {
+  clientId?: string;
+  deliveryStatus?: 'pending' | 'sent';
+};
+
+type ChatTypingPayload = {
+  type: 'typing';
+  fromUserId: string;
+  toUserId: string;
+  isTyping: boolean;
+};
+
+type ChatReadReceiptPayload = {
+  type: 'read_receipt';
+  readerUserId: string;
+  peerUserId: string;
+  messageIds: string[];
+  readAt: string;
+};
+
+type ChatPrivateMessagePayload = ChatMessage & {
+  type: 'private_message';
+  clientId?: string;
+};
+
 export const DashboardChatPage = () => {
   useViewportHeight();
   const { user } = useAuth();
@@ -41,7 +66,7 @@ export const DashboardChatPage = () => {
   const { conversationId } = useParams<{ conversationId: string }>();
   const [draft, setDraft] = useState('');
   const [peer, setPeer] = useState<ChatUser | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatUiMessage[]>([]);
   const [pendingAttachment, setPendingAttachment] = useState<PendingComposerAttachment | null>(null);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [isLoadingConversation, setIsLoadingConversation] = useState(true);
@@ -104,6 +129,35 @@ export const DashboardChatPage = () => {
       hour: 'numeric',
       minute: '2-digit'
     }).format(date);
+  };
+
+  const buildClientMessageId = (): string => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  };
+
+  const renderOwnMessageMeta = (message: ChatUiMessage) => {
+    if (message.deliveryStatus === 'pending') {
+      return (
+        <div className="mt-1 flex justify-end">
+          <Clock size={11} weight="regular" className="text-white/65" aria-label="Sending" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-1 flex items-center justify-end gap-1">
+        <p className="text-right text-[10px] leading-none text-white/60">{formatTime(message.createdAt)}</p>
+        {message.isRead ? (
+          <Checks size={11} weight="bold" className="text-white/85" aria-label="Read" />
+        ) : (
+          <Check size={11} weight="bold" className="text-white/70" aria-label="Sent" />
+        )}
+      </div>
+    );
   };
 
   const clearTypingIdleTimeout = () => {
@@ -210,10 +264,10 @@ export const DashboardChatPage = () => {
         }
 
         setPeer(resolvedPeer);
-        setMessages(history);
+        setMessages(history.map((message) => ({ ...message, deliveryStatus: 'sent' })));
         conversationCache.set(conversationCacheKey, {
           peer: resolvedPeer,
-          messages: history,
+          messages: history.map((message) => ({ ...message, deliveryStatus: 'sent' })),
           cachedAt: Date.now()
         });
 
@@ -327,8 +381,9 @@ export const DashboardChatPage = () => {
         socket.onmessage = (event) => {
           try {
             const payload = JSON.parse(event.data as string) as
-              | (ChatMessage & { type?: string })
-              | { type: 'typing'; fromUserId: string; toUserId: string; isTyping: boolean };
+              | ChatPrivateMessagePayload
+              | ChatTypingPayload
+              | ChatReadReceiptPayload;
 
             if (
               payload.type === 'typing' &&
@@ -360,6 +415,25 @@ export const DashboardChatPage = () => {
               return;
             }
 
+            if (payload.type === 'read_receipt') {
+              if (
+                payload.readerUserId !== peer.id ||
+                payload.peerUserId !== user.id ||
+                !Array.isArray(payload.messageIds) ||
+                !payload.messageIds.length
+              ) {
+                return;
+              }
+
+              const readMessageIds = new Set(payload.messageIds);
+              setMessages((current) =>
+                current.map((message) =>
+                  readMessageIds.has(message.id) ? { ...message, isRead: true, deliveryStatus: 'sent' } : message
+                )
+              );
+              return;
+            }
+
             if (payload.type !== 'private_message') {
               return;
             }
@@ -371,16 +445,32 @@ export const DashboardChatPage = () => {
             }
 
             setMessages((current) => {
+              const normalizedPayload: ChatUiMessage = {
+                ...payload,
+                deliveryStatus: 'sent'
+              };
+
+              if (payload.clientId) {
+                const optimisticIndex = current.findIndex((item) => item.clientId === payload.clientId);
+
+                if (optimisticIndex !== -1) {
+                  const next = [...current];
+                  next[optimisticIndex] = normalizedPayload;
+                  return next;
+                }
+              }
+
               if (current.some((item) => item.id === payload.id)) {
                 return current;
               }
 
-              return [...current, payload];
+              return [...current, normalizedPayload];
             });
 
             if (payload.fromUserId === peer.id) {
               setIsPeerTyping(false);
               clearPeerTypingTimeout();
+              void chatService.markConversationRead(peer.id);
             }
           } catch (_error) {
             return;
@@ -478,11 +568,26 @@ export const DashboardChatPage = () => {
       }
     }
 
+    const clientId = buildClientMessageId();
+    const optimisticMessage: ChatUiMessage = {
+      id: clientId,
+      clientId,
+      fromUserId: user?.id ?? 'current-user',
+      toUserId: peer.id,
+      content: outboundContent,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      deliveryStatus: 'pending'
+    };
+
+    setMessages((current) => [...current, optimisticMessage]);
+
     socketRef.current.send(
       JSON.stringify({
         type: 'private_message',
         toUserId: peer.id,
-        content: outboundContent
+        content: outboundContent,
+        clientId
       })
     );
 
@@ -602,7 +707,7 @@ export const DashboardChatPage = () => {
                     ) : (
                       <p className="whitespace-break-spaces break-words">{messageText}</p>
                     )}
-                    <p className="mt-1 text-right text-[10px] leading-none text-white/60">{formatTime(message.createdAt)}</p>
+                    {renderOwnMessageMeta(message)}
                   </div>
                 </div>
               );
@@ -613,7 +718,7 @@ export const DashboardChatPage = () => {
                 <img
                   src={peerAvatarUrl}
                   alt={`${peer?.fullName ?? 'Chat partner'} avatar`}
-                  className="mt-5 h-10 w-10 flex-shrink-0 rounded-full bg-dark-card"
+                  className="mt-5 h-11 w-11 flex-shrink-0 rounded-full bg-dark-card"
                 />
                 <div className="w-fit max-w-[calc(100%-3.75rem)] sm:max-w-[30rem]">
                   <p className="mb-1.5 text-sm font-medium text-white">{peer?.fullName ?? 'Chat partner'}</p>
@@ -660,21 +765,11 @@ export const DashboardChatPage = () => {
           })}
 
           {isPeerTyping && !isLoadingConversation && peer ? (
-            <div className="flex items-start gap-3" role="status" aria-live="polite" aria-label={`${peer.fullName} is typing`}>
-              <img
-                src={peerAvatarUrl}
-                alt={`${peer.fullName} avatar`}
-                className="mt-5 h-12 w-12 flex-shrink-0 rounded-full bg-dark-card"
-              />
-              <div className="w-fit max-w-[calc(100%-3.75rem)] sm:max-w-[30rem]">
-                <p className="mb-1.5 text-sm font-medium text-white">{peer.fullName}</p>
-                <div className="rounded-2xl rounded-tl-md bg-zinc-700 px-4 py-3 text-sm text-zinc-100">
-                  <div className="flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.9s' }} />
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '0.9s' }} />
-                    <span className="h-1.5 w-1.5 rounded-full bg-zinc-300 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '0.9s' }} />
-                  </div>
-                </div>
+            <div className="flex items-start" role="status" aria-live="polite" aria-label={`${peer.fullName} is typing`}>
+              <div className="flex items-center gap-1" aria-hidden>
+                <span className="h-2 w-2 rounded-full bg-zinc-100 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.9s' }} />
+                <span className="h-2 w-2 rounded-full bg-zinc-100 animate-bounce" style={{ animationDelay: '150ms', animationDuration: '0.9s' }} />
+                <span className="h-2 w-2 rounded-full bg-zinc-100 animate-bounce" style={{ animationDelay: '300ms', animationDuration: '0.9s' }} />
               </div>
             </div>
           ) : null}

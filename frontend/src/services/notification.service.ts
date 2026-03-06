@@ -56,6 +56,10 @@ export const notificationService = {
     await api.patch('/users/me/notifications/read-all');
   },
 
+  async clearAll(): Promise<void> {
+    await api.delete('/users/me/notifications');
+  },
+
   async markRead(notificationId: string): Promise<void> {
     await api.patch(`/users/me/notifications/${notificationId}/read`);
   }

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { AppError } from '../../utils/app-error';
 import { pushNotificationToUser } from '../chat/websocket';
 import {
+  clearMyNotificationsHandler,
   getMyNotificationsHandler,
   markMyNotificationReadHandler,
   getMyUnreadNotificationCountHandler,
@@ -207,6 +208,7 @@ export const markMeDashboardVisitedHandler = async (req: Request, res: Response)
 };
 
 export {
+  clearMyNotificationsHandler,
   getMyNotificationsHandler,
   markMyNotificationReadHandler,
   getMyUnreadNotificationCountHandler,

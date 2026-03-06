@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Bell, ChatCircle, FileText, HouseLine, Plus, SignOut, Wallet } from '@phosphor-icons/react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Bell, ChatCircle, FileText, HouseLine, Plus, SignOut, UserCircle, Wallet } from '@phosphor-icons/react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ChatHeader } from '../../components/chat/ChatHeader';
+import { Navbar } from '../../components/layout/Navbar';
 import { useAuth } from '../../hooks/useAuth';
 import { useChatNotificationStore } from '../../store/chat-notification.store';
 import { useViewportHeight } from '../../hooks/useViewportHeight';
 import { notificationService } from '../../services/notification.service';
 import { chatService } from '../../services/chat.service';
-import { buildInitialAvatarUrl } from '../../utils/avatar';
 
 export const DashboardLayout = () => {
   useViewportHeight();
@@ -30,18 +29,6 @@ export const DashboardLayout = () => {
   const [isHomeWelcomeReady, setIsHomeWelcomeReady] = useState(!isDashboardHomeRoute);
 
   const userFirstName = user?.fullName?.trim().split(/\s+/)[0] ?? 'Applicant';
-
-  const userAvatarUrl = useMemo(
-    () =>
-      buildInitialAvatarUrl({
-        fullName: user?.fullName,
-        email: user?.email,
-        id: user?.id,
-        fallback: 'Dashboard',
-        size: 36
-      }),
-    [user?.email, user?.fullName, user?.id]
-  );
 
   useEffect(() => {
     if (!user || user.role !== 'USER') {
@@ -201,58 +188,53 @@ export const DashboardLayout = () => {
   };
 
   return (
-    <div className="flex overflow-hidden bg-dark-bg" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
-      <aside className="relative z-20 flex w-fit flex-col items-center border-r-2 border-white/10 bg-dark-card px-0 pt-2 pb-4">
-        <nav className="flex flex-col items-center gap-1">
-          <Link
-            to="/"
-            className="group relative mb-4 flex items-center justify-center rounded-lg border-l-2 border-transparent p-3 transition-colors hover:bg-white/5"
-            aria-label="Truematch homepage"
-          >
-            <img src="/logos/logo-tm.png" alt="Truematch logo" className="size-10 object-contain" />
-          </Link>
+    <div className="flex flex-col overflow-hidden bg-dark-bg" style={{ height: 'calc(var(--vh, 1vh) * 100)' }}>
+      <Navbar />
 
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <aside className="relative z-20 flex w-fit flex-col items-center border-r-2 border-white/10 bg-dark-card px-0 pt-4 pb-4">
+          <nav className="flex flex-col items-center gap-1">
           <NavLink
             to="/dashboard"
             end
             className={({ isActive }) =>
-              `group relative flex items-center justify-center rounded-lg border-l-2 p-3 transition-colors ${
+              `group relative flex items-center justify-center border-l-4 p-3 transition-colors ${
                 isActive
-                  ? 'border-brand-500 bg-white/5 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-200'
+                  ? 'rounded-none border-brand-500 text-white'
+                  : 'rounded-lg border-transparent text-zinc-500 hover:text-zinc-200'
               }`
             }
             aria-label="Home"
           >
-            <HouseLine size={26} weight="regular" />
+            <HouseLine size={28} weight="regular" />
           </NavLink>
 
           <NavLink
             to="/dashboard/applications"
             className={({ isActive }) =>
-              `group relative flex items-center justify-center rounded-lg border-l-2 p-3 transition-colors ${
+              `group relative flex items-center justify-center border-l-4 p-3 transition-colors ${
                 isActive
-                  ? 'border-brand-500 bg-white/5 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-200'
+                  ? 'rounded-none border-brand-500 text-white'
+                  : 'rounded-lg border-transparent text-zinc-500 hover:text-zinc-200'
               }`
             }
             aria-label="My applications"
           >
-            <FileText size={26} weight="regular" />
+            <FileText size={28} weight="regular" />
           </NavLink>
 
           <NavLink
             to="/dashboard/chat"
             className={({ isActive }) =>
-              `group relative flex items-center justify-center rounded-lg border-l-2 p-3 transition-colors ${
+              `group relative flex items-center justify-center border-l-4 p-3 transition-colors ${
                 isActive
-                  ? 'border-brand-500 bg-white/5 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-200'
+                  ? 'rounded-none border-brand-500 text-white'
+                  : 'rounded-lg border-transparent text-zinc-500 hover:text-zinc-200'
               }`
             }
             aria-label="Chat"
           >
-            <ChatCircle size={26} weight="regular" />
+            <ChatCircle size={28} weight="regular" />
             {unreadMessageCount > 0 ? (
               <span className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
                 {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
@@ -263,29 +245,29 @@ export const DashboardLayout = () => {
           <NavLink
             to="/dashboard/wallet"
             className={({ isActive }) =>
-              `group relative flex items-center justify-center rounded-lg border-l-2 p-3 transition-colors ${
+              `group relative flex items-center justify-center border-l-4 p-3 transition-colors ${
                 isActive
-                  ? 'border-brand-500 bg-white/5 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-200'
+                  ? 'rounded-none border-brand-500 text-white'
+                  : 'rounded-lg border-transparent text-zinc-500 hover:text-zinc-200'
               }`
             }
             aria-label="MyWallet"
           >
-            <Wallet size={26} weight="regular" />
+            <Wallet size={28} weight="regular" />
           </NavLink>
 
           <NavLink
             to="/dashboard/notifications"
             className={({ isActive }) =>
-              `group relative flex items-center justify-center rounded-lg border-l-2 p-3 transition-colors ${
+              `group relative flex items-center justify-center border-l-4 p-3 transition-colors ${
                 isActive
-                  ? 'border-brand-500 bg-white/5 text-white'
-                  : 'border-transparent text-zinc-500 hover:text-zinc-200'
+                  ? 'rounded-none border-brand-500 text-white'
+                  : 'rounded-lg border-transparent text-zinc-500 hover:text-zinc-200'
               }`
             }
             aria-label="Notifications"
           >
-            <Bell size={26} weight="regular" />
+            <Bell size={28} weight="regular" />
             {unreadNotificationCount > 0 ? (
               <span className="absolute right-2 top-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
                 {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
@@ -295,41 +277,44 @@ export const DashboardLayout = () => {
 
           <NavLink
             to="/apply"
-            className="group relative flex items-center justify-center rounded-lg border-l-2 border-transparent p-3 text-white transition-colors hover:text-white"
+            className="group relative flex items-center justify-center rounded-lg border-l-4 border-transparent p-3 text-white transition-colors hover:text-white"
             aria-label="Apply"
           >
-            <Plus size={26} weight="regular" />
+            <Plus size={28} weight="regular" />
           </NavLink>
-        </nav>
+          </nav>
 
-        <div className="mb-8 mt-auto flex flex-col items-center gap-1">
-          <button
-            onClick={handleLogout}
-            className="mt-10 rounded-lg p-3 text-red-500 transition-colors hover:text-red-400"
-            aria-label="Logout"
-          >
-            <SignOut size={26} weight="regular" />
-          </button>
-        </div>
-      </aside>
+          <div className="mb-4 mt-auto flex flex-col items-center gap-1">
+            <NavLink
+              to="/dashboard/profile"
+              className={({ isActive }) =>
+                    `group relative flex items-center justify-center border-l-4 p-3 transition-colors ${
+                  isActive
+                      ? 'rounded-none border-brand-500 text-white'
+                      : 'rounded-lg border-transparent text-zinc-500 hover:text-zinc-200'
+                }`
+              }
+              aria-label="Profile"
+            >
+              <UserCircle size={28} weight="regular" />
+            </NavLink>
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <ChatHeader
-          avatarUrl={userAvatarUrl}
-          avatarAlt={`${user?.fullName ?? 'User'} avatar`}
-          title={isChatRoute ? "Chat" : isDashboardHomeRoute ? userFirstName : "Dashboard"}
-          isOnline
-          showIdentityText={false}
-          avatarAlign="right"
-          onAvatarClick={() => navigate('/dashboard/profile')}
-          // Ensure avatar size consistency
-          // The ChatHeader component uses h-10 w-10 for avatar by default
-        />
+            <button
+              onClick={handleLogout}
+              className="mt-10 rounded-lg p-3 text-red-500 transition-colors hover:text-red-400"
+              aria-label="Logout"
+            >
+              <SignOut size={28} weight="regular" />
+            </button>
+          </div>
+        </aside>
 
-        <section className="h-full w-full">
-          <Outlet />
-        </section>
-      </main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <section className="h-full w-full">
+            <Outlet />
+          </section>
+        </main>
+      </div>
     </div>
   );
 };

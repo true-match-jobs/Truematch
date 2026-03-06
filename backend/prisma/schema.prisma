@@ -46,10 +46,28 @@ model User {
   applications Application[]
   sentMessages ChatMessage[] @relation("SentMessages")
   receivedMessages ChatMessage[] @relation("ReceivedMessages")
+  clearedConversationsAsAdmin AdminConversationClearState[] @relation("AdminConversationClearByAdmin")
+  clearedConversationsAsUser AdminConversationClearState[] @relation("AdminConversationClearByUser")
   sentNotifications Notification[] @relation("NotificationSender")
   receivedNotifications Notification[] @relation("NotificationRecipient")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model AdminConversationClearState {
+  id String @id @default(uuid())
+  adminUserId String
+  userId String
+  clearedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adminUser User @relation("AdminConversationClearByAdmin", fields: [adminUserId], references: [id], onDelete: Cascade)
+  user User @relation("AdminConversationClearByUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([adminUserId, userId])
+  @@index([adminUserId, clearedAt])
+  @@index([userId])
 }
 
 model Notification {

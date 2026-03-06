@@ -17,6 +17,7 @@ export type ChatMessage = {
   fromUserId: string;
   toUserId: string;
   content: string;
+  isRead: boolean;
   createdAt: string;
 };
 
@@ -137,6 +138,10 @@ export const chatService = {
   async getAdminConversations(): Promise<AdminConversation[]> {
     const response = await api.get<{ conversations: AdminConversation[] }>('/chat/conversations');
     return response.data.conversations;
+  },
+
+  async clearAdminConversations(userIds: string[]): Promise<void> {
+    await api.post('/chat/conversations/clear', { userIds });
   },
 
   async getUnreadSummary(): Promise<ChatUnreadSummary> {

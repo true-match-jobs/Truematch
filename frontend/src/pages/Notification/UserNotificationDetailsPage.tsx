@@ -146,7 +146,7 @@ export const UserNotificationDetailsPage = () => {
                   <RelativeTime value={notification.createdAt} className="text-xs text-zinc-400" />
                 </div>
                 {/* Row 2: message */}
-                <p className="mt-2 text-sm text-zinc-300 whitespace-break-spaces break-words">
+                <p className="mt-2 text-base text-zinc-300 whitespace-break-spaces break-words">
                   {notification.message}
                 </p>
               </div>

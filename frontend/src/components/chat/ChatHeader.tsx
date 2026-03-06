@@ -28,7 +28,7 @@ export const ChatHeader = ({
   onBackButtonClick
 }: ChatHeaderProps) => {
   const isAvatarAlignedRight = avatarAlign === 'right';
-  const avatarClassName = `h-8 w-8 rounded-full bg-dark-surface ${showAvatarBorder ? 'border-2 border-white/70' : ''}`;
+  const avatarClassName = `h-9 w-9 rounded-full bg-dark-surface ${showAvatarBorder ? 'border-2 border-white/70' : ''}`;
 
   const avatarNode = avatarUrl ? (
     <img src={avatarUrl} alt={avatarAlt} className={avatarClassName} />
@@ -42,8 +42,8 @@ export const ChatHeader = ({
         {isLoading ? (
           <div className={`flex items-center gap-3 ${isAvatarAlignedRight ? 'justify-end' : ''}`} aria-hidden>
             {showBackButton ? <div className="h-5 w-5 animate-pulse rounded-full bg-white/10" /> : null}
-            <div className={`relative h-8 w-8 ${showBackButton ? 'ml-2' : ''}`}>
-              <div className="h-8 w-8 animate-pulse rounded-full bg-white/10" />
+            <div className={`relative h-9 w-9 ${showBackButton ? 'ml-2' : ''}`}>
+              <div className="h-9 w-9 animate-pulse rounded-full bg-white/10" />
               <div className="absolute bottom-0 right-0 h-2.5 w-2.5 animate-pulse rounded-full border border-dark-bg bg-white/10" />
             </div>
             {showIdentityText ? (

@@ -4,6 +4,7 @@ import { asyncHandler } from '../../utils/async-handler';
 import {
 	adminConversationsHandler,
 	chatSocketTokenHandler,
+	clearAdminConversationsHandler,
 	chatPeerHandler,
 	conversationMessagesHandler,
 	downloadChatAttachmentHandler,
@@ -19,6 +20,7 @@ chatRouter.get('/socket-token', authMiddleware, asyncHandler(chatSocketTokenHand
 chatRouter.get('/peer', authMiddleware, asyncHandler(chatPeerHandler));
 chatRouter.get('/messages/:peerUserId', authMiddleware, asyncHandler(conversationMessagesHandler));
 chatRouter.get('/conversations', authMiddleware, requireAdmin, asyncHandler(adminConversationsHandler));
+chatRouter.post('/conversations/clear', authMiddleware, requireAdmin, asyncHandler(clearAdminConversationsHandler));
 chatRouter.get('/unread-summary', authMiddleware, asyncHandler(unreadSummaryHandler));
 chatRouter.patch('/read/:peerUserId', authMiddleware, asyncHandler(markConversationReadHandler));
 chatRouter.post('/attachments', authMiddleware, uploadChatAttachment, asyncHandler(uploadChatAttachmentHandler));

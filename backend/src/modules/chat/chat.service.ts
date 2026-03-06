@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { UserRole } from '@prisma/client';
+import { Prisma, type UserRole } from '@prisma/client';
 import type { UploadApiResponse } from 'cloudinary';
 import { cloudinary } from '../../config/cloudinary';
 import { prisma } from '../../config/prisma';
@@ -24,6 +24,7 @@ export type ChatMessage = {
   fromUserId: string;
   toUserId: string;
   content: string;
+  isRead: boolean;
   createdAt: string;
 };
 
@@ -176,6 +177,7 @@ export const addConversationMessage = async (fromUserId: string, toUserId: strin
       fromUserId: true,
       toUserId: true,
       content: true,
+      isRead: true,
       createdAt: true
     }
   });
@@ -185,6 +187,7 @@ export const addConversationMessage = async (fromUserId: string, toUserId: strin
     fromUserId: createdMessage.fromUserId,
     toUserId: createdMessage.toUserId,
     content: createdMessage.content,
+    isRead: createdMessage.isRead,
     createdAt: createdMessage.createdAt.toISOString()
   };
 };
@@ -211,6 +214,7 @@ export const getConversationMessages = async (currentUserId: string, peerUserId:
       fromUserId: true,
       toUserId: true,
       content: true,
+      isRead: true,
       createdAt: true
     }
   });
@@ -220,6 +224,7 @@ export const getConversationMessages = async (currentUserId: string, peerUserId:
     fromUserId: message.fromUserId,
     toUserId: message.toUserId,
     content: message.content,
+    isRead: message.isRead,
     createdAt: message.createdAt.toISOString()
   }));
 };
@@ -238,6 +243,33 @@ export const getAdminConversations = async (adminUserId: string): Promise<AdminC
       updatedAt: true
     }
   });
+
+  let clearedStates: Array<{ userId: string; clearedAt: Date }> = [];
+
+  try {
+    clearedStates = await prisma.adminConversationClearState.findMany({
+      where: {
+        adminUserId,
+        userId: {
+          in: users.map((user) => user.id)
+        }
+      },
+      select: {
+        userId: true,
+        clearedAt: true
+      }
+    });
+  } catch (error) {
+    const isRecoverableClearStateReadError =
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      (error.code === 'P2021' || error.code === 'P2022');
+
+    if (!isRecoverableClearStateReadError) {
+      throw error;
+    }
+  }
+
+  const clearedAtByUserId = new Map(clearedStates.map((state) => [state.userId, state.clearedAt.getTime()]));
 
   const conversationCandidates = await Promise.all(
     users.map(async (user) => {
@@ -268,6 +300,13 @@ export const getAdminConversations = async (adminUserId: string): Promise<AdminC
         return null;
       }
 
+      const clearedAt = clearedAtByUserId.get(user.id);
+
+      // Keep the conversation hidden for admin until a newer message appears.
+      if (typeof clearedAt === 'number' && lastMessage.createdAt.getTime() <= clearedAt) {
+        return null;
+      }
+
       const unreadMessageCount = await prisma.chatMessage.count({
         where: {
           fromUserId: user.id,
@@ -291,6 +330,54 @@ export const getAdminConversations = async (adminUserId: string): Promise<AdminC
     .sort((first, second) => new Date(second.lastMessageAt).getTime() - new Date(first.lastMessageAt).getTime());
 
   return conversations;
+};
+
+export const clearAdminConversationList = async (adminUserId: string, userIds: string[]): Promise<void> => {
+  if (!userIds.length) {
+    return;
+  }
+
+  const now = new Date();
+  const uniqueUserIds = Array.from(new Set(userIds));
+
+  const existingUsers = await prisma.user.findMany({
+    where: {
+      id: {
+        in: uniqueUserIds
+      },
+      role: 'USER'
+    },
+    select: {
+      id: true
+    }
+  });
+
+  const validUserIds = existingUsers.map((user) => user.id);
+
+  if (!validUserIds.length) {
+    return;
+  }
+
+  await Promise.all(
+    validUserIds.map((userId) =>
+      prisma.adminConversationClearState.upsert({
+        where: {
+          adminUserId_userId: {
+            adminUserId,
+            userId
+          }
+        },
+        create: {
+          adminUserId,
+          userId,
+          clearedAt: now
+        },
+        update: {
+          clearedAt: now
+        }
+      })
+    )
+  );
 };
 
 export const getAssignedAdminForUser = async (): Promise<ChatUser | null> => {
@@ -326,15 +413,32 @@ export const getUnreadSummary = async (currentUserId: string, currentUserRole: U
   };
 };
 
-export const markConversationRead = async (currentUserId: string, peerUserId: string): Promise<void> => {
-  await prisma.chatMessage.updateMany({
+export const markConversationRead = async (currentUserId: string, peerUserId: string): Promise<string[]> => {
+  const unreadMessages = await prisma.chatMessage.findMany({
     where: {
       fromUserId: peerUserId,
       toUserId: currentUserId,
       ...unreadFilter
     },
+    select: {
+      id: true
+    }
+  });
+
+  if (!unreadMessages.length) {
+    return [];
+  }
+
+  await prisma.chatMessage.updateMany({
+    where: {
+      id: {
+        in: unreadMessages.map((message) => message.id)
+      }
+    },
     data: readUpdate
   });
+
+  return unreadMessages.map((message) => message.id);
 };
 
 export const uploadChatAttachmentFile = async (file: Express.Multer.File): Promise<ChatAttachmentUploadResult> => {

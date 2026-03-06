@@ -3,6 +3,7 @@ import { AppError } from '../../utils/app-error';
 import { pushNotificationToUser } from '../chat/websocket';
 import {
   createNotification,
+  deleteAllUserNotifications,
   ensureRequiredActionNotificationsForUser,
   getUnreadNotificationCount,
   getUserNotifications,
@@ -113,4 +114,17 @@ export const markMyNotificationReadHandler = async (req: Request, res: Response)
   await markNotificationRead(req.user.userId, req.user.role, notificationId);
 
   res.status(200).json({ message: 'Notification marked as read' });
+};
+
+export const clearMyNotificationsHandler = async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) {
+    throw new AppError(401, 'Unauthorized');
+  }
+
+  const deletedCount = await deleteAllUserNotifications(req.user.userId, req.user.role);
+
+  res.status(200).json({
+    message: 'Notifications cleared successfully',
+    deletedCount
+  });
 };
