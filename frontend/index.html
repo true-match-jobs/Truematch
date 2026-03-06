@@ -84,9 +84,47 @@
         }
       })();
     </script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background-color: #09090b;
+      }
+
+      .bootstrap-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100dvh;
+        background-color: #09090b;
+      }
+
+      .bootstrap-loader__spinner {
+        width: 40px;
+        height: 40px;
+        border-radius: 9999px;
+        border: 2px solid #52525b;
+        border-top-color: #f4f4f5;
+        animation: bootstrap-spin 0.9s linear infinite;
+      }
+
+      @keyframes bootstrap-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
-  <body class="bg-slate-50">
-    <div id="root"></div>
+  <body>
+    <div id="root">
+      <div class="bootstrap-loader" aria-live="polite" aria-busy="true" role="status">
+        <div class="bootstrap-loader__spinner" aria-label="Loading"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

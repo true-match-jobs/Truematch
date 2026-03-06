@@ -288,16 +288,16 @@ export const AdminDashboardConversationsPage = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{conversation.user.fullName}</p>
+                        <RelativeTime value={conversation.lastMessageAt} className="shrink-0 text-xs text-zinc-400" />
+                      </div>
+
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate text-sm text-zinc-300">{previewText}</p>
                         {conversation.unreadMessageCount > 0 ? (
                           <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                             {conversation.unreadMessageCount > 99 ? '99+' : conversation.unreadMessageCount}
                           </span>
                         ) : null}
-                      </div>
-
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <p className="min-w-0 flex-1 truncate text-sm text-zinc-300">{previewText}</p>
-                        <RelativeTime value={conversation.lastMessageAt} className="shrink-0 text-xs text-zinc-400" />
                       </div>
                     </div>
                   </button>
@@ -334,16 +334,16 @@ export const AdminDashboardConversationsPage = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{conversation.user.fullName}</p>
+                    <RelativeTime value={conversation.lastMessageAt} className="shrink-0 text-xs text-zinc-400" />
+                  </div>
+
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <p className="min-w-0 flex-1 truncate text-sm text-zinc-300">{previewText}</p>
                     {conversation.unreadMessageCount > 0 ? (
                       <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-semibold leading-none text-white">
                         {conversation.unreadMessageCount > 99 ? '99+' : conversation.unreadMessageCount}
                       </span>
                     ) : null}
-                  </div>
-
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <p className="min-w-0 flex-1 truncate text-sm text-zinc-300">{previewText}</p>
-                    <RelativeTime value={conversation.lastMessageAt} className="shrink-0 text-xs text-zinc-400" />
                   </div>
                 </div>
                 </Link>

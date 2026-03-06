@@ -6,7 +6,26 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(5000),
-  FRONTEND_ORIGIN: z.string().url(),
+  FRONTEND_ORIGIN: z
+    .string()
+    .min(1)
+    .refine(
+      (value) => {
+        const origins = value
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter((origin) => origin.length > 0);
+
+        if (!origins.length) {
+          return false;
+        }
+
+        return origins.every((origin) => z.string().url().safeParse(origin).success);
+      },
+      {
+        message: 'FRONTEND_ORIGIN must be a URL or comma-separated list of URLs'
+      }
+    ),
   DATABASE_URL: z.string().min(1),
   JWT_ACCESS_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
