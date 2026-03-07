@@ -79,6 +79,7 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
 
   const fromName = env.SMTP_FROM_NAME?.trim() || 'TrueMatch';
   const fromAddress = env.SMTP_FROM_EMAIL as string;
+  const smtpHost = env.SMTP_HOST?.trim() || 'unset';
 
   const [primaryPort, fallbackPort] = getPortSequence();
   const primaryTransporter = getTransporter(primaryPort);
@@ -97,6 +98,15 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
     });
     return;
   } catch (error) {
+    const primaryCode = (error as Error & { code?: string }).code ?? 'UNKNOWN';
+
+    console.error('Primary SMTP send failed', {
+      smtpHost,
+      port: primaryPort,
+      code: primaryCode,
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+
     if (!isTimeoutError(error)) {
       throw error;
     }
@@ -107,12 +117,25 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
       throw error;
     }
 
-    await fallbackTransporter.sendMail({
-      from: `${fromName} <${fromAddress}>`,
-      to,
-      subject,
-      html,
-      text
-    });
+    try {
+      await fallbackTransporter.sendMail({
+        from: `${fromName} <${fromAddress}>`,
+        to,
+        subject,
+        html,
+        text
+      });
+    } catch (fallbackError) {
+      const fallbackCode = (fallbackError as Error & { code?: string }).code ?? 'UNKNOWN';
+
+      console.error('Fallback SMTP send failed', {
+        smtpHost,
+        port: fallbackPort,
+        code: fallbackCode,
+        message: fallbackError instanceof Error ? fallbackError.message : 'Unknown error'
+      });
+
+      throw fallbackError;
+    }
   }
 };

@@ -288,19 +288,37 @@ export const sendEmailVerification = async (userId: string): Promise<void> => {
     where: { id: user.id },
     data: {
       emailVerificationTokenHash: tokenHash,
-      emailVerificationTokenExpiresAt: tokenExpiresAt,
-      emailVerificationLastSentAt: new Date(now)
+      emailVerificationTokenExpiresAt: tokenExpiresAt
     }
   });
 
   const verificationLink = buildEmailVerificationLink(rawToken);
 
-  await sendEmail({
-    to: user.email,
-    subject: 'Verify your email address — TrueMatch',
-    html: buildEmailVerificationHtml(user.fullName, verificationLink, tokenExpiresAt),
-    text: buildEmailVerificationText(user.fullName, verificationLink, tokenExpiresAt)
-  });
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your email address — TrueMatch',
+      html: buildEmailVerificationHtml(user.fullName, verificationLink, tokenExpiresAt),
+      text: buildEmailVerificationText(user.fullName, verificationLink, tokenExpiresAt)
+    });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationLastSentAt: new Date(now)
+      }
+    });
+  } catch (error) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationTokenHash: null,
+        emailVerificationTokenExpiresAt: null
+      }
+    });
+
+    throw error;
+  }
 };
 
 export const verifyEmailAddress = async (token: string): Promise<void> => {
@@ -471,19 +489,37 @@ export const requestPasswordReset = async (payload: ForgotPasswordDto): Promise<
     where: { id: user.id },
     data: {
       passwordResetTokenHash: tokenHash,
-      passwordResetTokenExpiresAt: tokenExpiresAt,
-      passwordResetLastSentAt: new Date(now)
+      passwordResetTokenExpiresAt: tokenExpiresAt
     }
   });
 
   const resetLink = buildPasswordResetLink(rawToken);
 
-  await sendEmail({
-    to: user.email,
-    subject: 'Reset your password — TrueMatch',
-    html: buildPasswordResetHtml(user.fullName, resetLink, tokenExpiresAt),
-    text: buildPasswordResetText(user.fullName, resetLink, tokenExpiresAt)
-  });
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset your password — TrueMatch',
+      html: buildPasswordResetHtml(user.fullName, resetLink, tokenExpiresAt),
+      text: buildPasswordResetText(user.fullName, resetLink, tokenExpiresAt)
+    });
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetLastSentAt: new Date(now)
+      }
+    });
+  } catch (error) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetTokenHash: null,
+        passwordResetTokenExpiresAt: null
+      }
+    });
+
+    throw error;
+  }
 };
 
 export const resetPassword = async (payload: ResetPasswordDto): Promise<void> => {
