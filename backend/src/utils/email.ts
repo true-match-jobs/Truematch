@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { resolve4 } from 'dns/promises';
 import { env } from '../config/env';
 
 type SendEmailArgs = {
@@ -15,13 +16,13 @@ const hasSmtpConfig =
   Boolean(env.SMTP_PASS) &&
   Boolean(env.SMTP_FROM_EMAIL);
 
-const getTransporter = (host: string, port: number) => {
+const getTransporter = (connectHost: string, tlsServerName: string, port: number) => {
   if (!hasSmtpConfig) {
     return null;
   }
 
   return nodemailer.createTransport({
-    host,
+    host: connectHost,
     port,
     secure: port === 465,
     requireTLS: port !== 465,
@@ -33,7 +34,7 @@ const getTransporter = (host: string, port: number) => {
       pass: env.SMTP_PASS
     },
     tls: {
-      servername: host
+      servername: tlsServerName
     }
   });
 };
@@ -79,6 +80,14 @@ const getPortSequence = (): [number, number] => {
   return [configuredPort, fallbackPort];
 };
 
+const resolveIpv4Addresses = async (host: string): Promise<string[]> => {
+  try {
+    return await resolve4(host);
+  } catch {
+    return [];
+  }
+};
+
 export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Promise<void> => {
   if (!hasSmtpConfig) {
     const warning = 'SMTP configuration missing. Email not sent.';
@@ -97,11 +106,41 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
   const [primaryPort, fallbackPort] = getPortSequence();
   const portSequence = [primaryPort, fallbackPort];
 
-  const attempts: Array<{ host: string; port: number }> = [];
+  const hostAttempts = await Promise.all(
+    hostSequence.map(async (host) => {
+      const ipv4Addresses = await resolveIpv4Addresses(host);
 
-  hostSequence.forEach((host) => {
+      return {
+        host,
+        ipv4Addresses
+      };
+    })
+  );
+
+  const attempts: Array<{
+    connectHost: string;
+    tlsServerName: string;
+    port: number;
+    mode: 'hostname' | 'ipv4';
+  }> = [];
+
+  hostAttempts.forEach(({ host, ipv4Addresses }) => {
     portSequence.forEach((port) => {
-      attempts.push({ host, port });
+      attempts.push({
+        connectHost: host,
+        tlsServerName: host,
+        port,
+        mode: 'hostname'
+      });
+
+      ipv4Addresses.forEach((ipAddress) => {
+        attempts.push({
+          connectHost: ipAddress,
+          tlsServerName: host,
+          port,
+          mode: 'ipv4'
+        });
+      });
     });
   });
 
@@ -113,7 +152,7 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
 
   for (let index = 0; index < attempts.length; index += 1) {
     const attempt = attempts[index];
-    const transporter = getTransporter(attempt.host, attempt.port);
+    const transporter = getTransporter(attempt.connectHost, attempt.tlsServerName, attempt.port);
 
     if (!transporter) {
       continue;
@@ -134,8 +173,10 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
       const errorCode = (error as Error & { code?: string }).code ?? 'UNKNOWN';
 
       console.error('SMTP send attempt failed', {
-        host: attempt.host,
+        connectHost: attempt.connectHost,
+        tlsServerName: attempt.tlsServerName,
         port: attempt.port,
+        mode: attempt.mode,
         code: errorCode,
         message: error instanceof Error ? error.message : 'Unknown error',
         attempt: `${index + 1}/${attempts.length}`
