@@ -372,14 +372,6 @@ export const register = async (payload: RegisterDto): Promise<AuthResponse> => {
     }
   });
 
-  if (user.role === 'USER') {
-    try {
-      await sendEmailVerification(user.id);
-    } catch (error) {
-      console.error('Failed to send registration verification email', error);
-    }
-  }
-
   const jwtPayload = { userId: user.id, email: user.email, role: user.role };
 
   return {

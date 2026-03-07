@@ -6,7 +6,6 @@ import { prisma } from '../../config/prisma';
 import { AppError } from '../../utils/app-error';
 import { hashPassword } from '../../utils/hash';
 import { signAccessToken, signRefreshToken } from '../../utils/jwt';
-import { sendEmailVerification } from '../auth/auth.service';
 import { addConversationMessage, getAssignedAdminForUser } from '../chat/chat.service';
 import { pushNotificationToUser } from '../chat/websocket';
 import { ensureRequiredActionNotificationsForUser } from '../notification/notification.service';
@@ -199,12 +198,6 @@ export const submitApplication = async (payload: SubmitApplicationDto): Promise<
   const jwtPayload = { userId: user.id, email: user.email, role: user.role };
 
   scheduleInitialOnboardingAutomation(user.id, user.fullName, payload.applicationType);
-
-  try {
-    await sendEmailVerification(user.id);
-  } catch (error) {
-    console.error('Failed to send verification email after application submission', error);
-  }
 
   return {
     user: sanitizeUser(user),
