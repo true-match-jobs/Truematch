@@ -8,6 +8,7 @@ import { Snackbar } from '../../components/ui/Snackbar';
 import { Stepper } from '../../components/ui/Stepper';
 import { SNACKBAR_AUTO_DISMISS_DELAY_MS } from '../../constants/snackbar';
 import { useAuth } from '../../hooks/useAuth';
+import { prewarmBackend } from '../../services/api';
 import { applicationService } from '../../services/application.service';
 import {
   StepApplicationSummary,
@@ -144,6 +145,14 @@ export const ApplyPage = () => {
       window.clearTimeout(timer);
     };
   }, [showSuccessSnackbar]);
+
+  useEffect(() => {
+    if (currentFlowStep.key !== 'emailPassword') {
+      return;
+    }
+
+    void prewarmBackend();
+  }, [currentFlowStep.key]);
 
   const submitReapplication = async (payload: {
     applicationType: 'study_scholarship' | 'work_employment';

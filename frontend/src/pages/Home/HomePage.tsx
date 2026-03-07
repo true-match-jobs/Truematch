@@ -1,9 +1,15 @@
+import { Suspense, lazy } from 'react';
 import { Footer } from '../../components/layout/Footer';
 import { Navbar } from '../../components/layout/Navbar';
-import { AboutUs } from './AboutUs';
 import { Hero } from './Hero';
-import { Services } from './Services';
-import { Testimonials } from './Testimonials';
+
+const Services = lazy(() => import('./Services').then((module) => ({ default: module.Services })));
+const AboutUs = lazy(() => import('./AboutUs').then((module) => ({ default: module.AboutUs })));
+const Testimonials = lazy(() => import('./Testimonials').then((module) => ({ default: module.Testimonials })));
+
+const HomeSectionSkeleton = ({ minHeightClass }: { minHeightClass: string }) => {
+  return <section aria-hidden className={`bg-dark-bg ${minHeightClass}`} />;
+};
 
 export const HomePage = () => {
   return (
@@ -11,9 +17,15 @@ export const HomePage = () => {
       <Navbar />
       <main>
         <Hero />
-        <Services />
-        <AboutUs />
-        <Testimonials />
+        <Suspense fallback={<HomeSectionSkeleton minHeightClass="min-h-[380px]" />}>
+          <Services />
+        </Suspense>
+        <Suspense fallback={<HomeSectionSkeleton minHeightClass="min-h-[420px]" />}>
+          <AboutUs />
+        </Suspense>
+        <Suspense fallback={<HomeSectionSkeleton minHeightClass="min-h-[360px]" />}>
+          <Testimonials />
+        </Suspense>
       </main>
       <Footer />
     </div>

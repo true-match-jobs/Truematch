@@ -1,17 +1,19 @@
-import { useState, type FormEvent } from 'react';
+import { Suspense, lazy, useState, type FormEvent } from 'react';
 import type { AxiosError } from 'axios';
 import { MagnifyingGlass } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
 import type { ApplicationStatus } from '../../../../shared/applicationStatus';
-import { ApplicationProgressModal } from '../../components/application/ApplicationProgressModal';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
-import { applicationService } from '../../services/application.service';
-import { useDashboardStore } from '../../store/dashboard.store';
+
+const ApplicationProgressModal = lazy(() =>
+  import('../../components/application/ApplicationProgressModal').then((module) => ({
+    default: module.ApplicationProgressModal
+  }))
+);
 
 export const Hero = () => {
   const { user, isAuthenticated } = useAuth();
-  const loadDashboardData = useDashboardStore((state) => state.loadDashboardData);
   const [applicationId, setApplicationId] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [trackerError, setTrackerError] = useState<string | null>(null);
@@ -31,7 +33,10 @@ export const Hero = () => {
     try {
       setTrackerError(null);
       setIsSearching(true);
+
+      const { applicationService } = await import('../../services/application.service');
       const tracker = await applicationService.getTrackerStatus(trimmedApplicationId);
+
       setTrackerStatus(tracker.applicationStatus);
       setTrackerUniversityName(tracker.universityName ?? '');
       setTrackerUniversityCountry(tracker.universityCountry ?? null);
@@ -40,6 +45,8 @@ export const Hero = () => {
       if (isAuthenticated && user?.role === 'USER') {
         try {
           await applicationService.markTrackerViewed(trimmedApplicationId);
+          const { useDashboardStore } = await import('../../store/dashboard.store');
+          const loadDashboardData = useDashboardStore.getState().loadDashboardData;
           await loadDashboardData(true, false);
         } catch (_error) {
           return;
@@ -116,13 +123,15 @@ export const Hero = () => {
       </div>
 
       {trackerStatus ? (
-        <ApplicationProgressModal
-          isOpen={isTrackerOpen}
-          onClose={() => setIsTrackerOpen(false)}
-          applicationStatus={trackerStatus}
-          universityName={trackerUniversityName}
-          universityCountry={trackerUniversityCountry}
-        />
+        <Suspense fallback={null}>
+          <ApplicationProgressModal
+            isOpen={isTrackerOpen}
+            onClose={() => setIsTrackerOpen(false)}
+            applicationStatus={trackerStatus}
+            universityName={trackerUniversityName}
+            universityCountry={trackerUniversityCountry}
+          />
+        </Suspense>
       ) : null}
     </section>
   );

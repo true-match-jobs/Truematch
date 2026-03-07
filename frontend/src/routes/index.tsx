@@ -2,7 +2,13 @@ import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { useChatNotificationStore } from '../store/chat-notification.store';
+import { HomePage } from '../pages/Home/HomePage';
+
+const ProtectedSocketConnector = lazy(() =>
+  import('../components/auth/ProtectedSocketConnector').then((module) => ({
+    default: module.ProtectedSocketConnector
+  }))
+);
 
 const AdminApplicationDetailsPage = lazy(() =>
   import('../pages/Admin/AdminApplicationDetailsPage').then((module) => ({ default: module.AdminApplicationDetailsPage }))
@@ -56,36 +62,12 @@ const UserNotificationsPage = lazy(() =>
 const UserNotificationDetailsPage = lazy(() =>
   import('../pages/Notification/UserNotificationDetailsPage').then((module) => ({ default: module.UserNotificationDetailsPage }))
 );
-const HomePage = lazy(() => import('../pages/Home/HomePage').then((module) => ({ default: module.HomePage })));
 const LogoGeneratorPage = lazy(() =>
   import('../pages/Home/LogoGeneratorPage').then((module) => ({ default: module.LogoGeneratorPage }))
 );
 
 const ProtectedRoute = () => {
   const { user, isAuthenticated, isBootstrapping } = useAuth();
-  const connectNotifications = useChatNotificationStore((state) => state.connect);
-  const disconnectNotifications = useChatNotificationStore((state) => state.disconnect);
-
-  useEffect(() => {
-    if (!isAuthenticated || !user?.id || !user.role || !user.email) {
-      return;
-    }
-
-    connectNotifications(user);
-
-    return () => {
-      disconnectNotifications();
-    };
-  }, [
-    connectNotifications,
-    disconnectNotifications,
-    isAuthenticated,
-    user?.email,
-    user?.fullName,
-    user?.hasVisitedDashboard,
-    user?.id,
-    user?.role
-  ]);
 
   if (isBootstrapping) {
     return <LoadingSpinner className="min-h-screen" />;
@@ -95,7 +77,14 @@ const ProtectedRoute = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <Suspense fallback={null}>
+        <ProtectedSocketConnector user={user} isAuthenticated={isAuthenticated} />
+      </Suspense>
+      <Outlet />
+    </>
+  );
 };
 
 const AdminRoute = () => {
@@ -117,12 +106,6 @@ const AdminRoute = () => {
 };
 
 const HomeRoute = () => {
-  const { isBootstrapping } = useAuth();
-
-  if (isBootstrapping) {
-    return <LoadingSpinner className="min-h-screen" />;
-  }
-
   return <HomePage />;
 };
 

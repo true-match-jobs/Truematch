@@ -3,9 +3,12 @@ import axios, { AxiosError } from 'axios';
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_URL ?? '/api/v1';
 const COLD_START_IDLE_THRESHOLD_MS = 12 * 60 * 1000;
 const WARMUP_TIMEOUT_MS = 8_000;
+const WARMUP_COOLDOWN_MS = 60_000;
 
 let lastApiActivityAt = Date.now();
 let warmupPromise: Promise<void> | null = null;
+let lastWarmupAttemptAt = 0;
+let hasSuccessfulApiResponse = false;
 
 const buildHealthUrl = (rawBaseUrl: string): string => {
   const trimmedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
@@ -42,10 +45,22 @@ const shouldWarmupBeforeRequest = (method?: string, url?: string): boolean => {
     return false;
   }
 
+  if (!hasSuccessfulApiResponse) {
+    return true;
+  }
+
   return Date.now() - lastApiActivityAt > COLD_START_IDLE_THRESHOLD_MS;
 };
 
-const warmupBackendIfIdle = async (): Promise<void> => {
+const warmupBackend = async (force = false): Promise<void> => {
+  const now = Date.now();
+
+  if (!force && now - lastWarmupAttemptAt < WARMUP_COOLDOWN_MS) {
+    return;
+  }
+
+  lastWarmupAttemptAt = now;
+
   if (!warmupPromise) {
     warmupPromise = axios
       .get(healthUrl, {
@@ -62,6 +77,10 @@ const warmupBackendIfIdle = async (): Promise<void> => {
   await warmupPromise;
 };
 
+export const prewarmBackend = async (): Promise<void> => {
+  await warmupBackend(true);
+};
+
 export const api = axios.create({
   baseURL,
   withCredentials: true
@@ -71,7 +90,7 @@ let refreshPromise: Promise<void> | null = null;
 
 api.interceptors.request.use(async (config) => {
   if (shouldWarmupBeforeRequest(config.method, config.url)) {
-    await warmupBackendIfIdle();
+    await warmupBackend();
   }
 
   return config;
@@ -80,6 +99,7 @@ api.interceptors.request.use(async (config) => {
 api.interceptors.response.use(
   (response) => {
     lastApiActivityAt = Date.now();
+    hasSuccessfulApiResponse = true;
     return response;
   },
   async (error: AxiosError) => {
