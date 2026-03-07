@@ -15,14 +15,8 @@ const hasSmtpConfig =
   Boolean(env.SMTP_PASS) &&
   Boolean(env.SMTP_FROM_EMAIL);
 
-const getTransporter = (port: number) => {
+const getTransporter = (host: string, port: number) => {
   if (!hasSmtpConfig) {
-    return null;
-  }
-
-  const host = env.SMTP_HOST?.trim();
-
-  if (!host) {
     return null;
   }
 
@@ -44,18 +38,38 @@ const getTransporter = (port: number) => {
   });
 };
 
-const isTimeoutError = (error: unknown): boolean => {
+const isConnectionLevelError = (error: unknown): boolean => {
   if (!(error instanceof Error)) {
     return false;
   }
 
   const maybeCode = (error as Error & { code?: string }).code;
 
-  if (maybeCode === 'ETIMEDOUT') {
+  if (['ETIMEDOUT', 'ECONNECTION', 'ESOCKET', 'EHOSTUNREACH', 'ENETUNREACH'].includes(maybeCode ?? '')) {
     return true;
   }
 
   return error.message.toLowerCase().includes('timeout');
+};
+
+const getHostSequence = (): string[] => {
+  const configuredHost = env.SMTP_HOST?.trim() || '';
+
+  if (!configuredHost) {
+    return [];
+  }
+
+  const hosts = [configuredHost];
+
+  if (configuredHost === 'smtp.zoho.com') {
+    hosts.push('smtppro.zoho.com');
+  }
+
+  if (configuredHost === 'smtppro.zoho.com') {
+    hosts.push('smtp.zoho.com');
+  }
+
+  return hosts;
 };
 
 const getPortSequence = (): [number, number] => {
@@ -79,63 +93,63 @@ export const sendEmail = async ({ to, subject, html, text }: SendEmailArgs): Pro
 
   const fromName = env.SMTP_FROM_NAME?.trim() || 'TrueMatch';
   const fromAddress = env.SMTP_FROM_EMAIL as string;
-  const smtpHost = env.SMTP_HOST?.trim() || 'unset';
-
+  const hostSequence = getHostSequence();
   const [primaryPort, fallbackPort] = getPortSequence();
-  const primaryTransporter = getTransporter(primaryPort);
+  const portSequence = [primaryPort, fallbackPort];
 
-  if (!primaryTransporter) {
+  const attempts: Array<{ host: string; port: number }> = [];
+
+  hostSequence.forEach((host) => {
+    portSequence.forEach((port) => {
+      attempts.push({ host, port });
+    });
+  });
+
+  if (!attempts.length) {
     throw new Error('SMTP transporter could not be created');
   }
 
-  try {
-    await primaryTransporter.sendMail({
-      from: `${fromName} <${fromAddress}>`,
-      to,
-      subject,
-      html,
-      text
-    });
-    return;
-  } catch (error) {
-    const primaryCode = (error as Error & { code?: string }).code ?? 'UNKNOWN';
+  let lastError: unknown = null;
 
-    console.error('Primary SMTP send failed', {
-      smtpHost,
-      port: primaryPort,
-      code: primaryCode,
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+  for (let index = 0; index < attempts.length; index += 1) {
+    const attempt = attempts[index];
+    const transporter = getTransporter(attempt.host, attempt.port);
 
-    if (!isTimeoutError(error)) {
-      throw error;
-    }
-
-    const fallbackTransporter = getTransporter(fallbackPort);
-
-    if (!fallbackTransporter) {
-      throw error;
+    if (!transporter) {
+      continue;
     }
 
     try {
-      await fallbackTransporter.sendMail({
+      await transporter.sendMail({
         from: `${fromName} <${fromAddress}>`,
         to,
         subject,
         html,
         text
       });
-    } catch (fallbackError) {
-      const fallbackCode = (fallbackError as Error & { code?: string }).code ?? 'UNKNOWN';
+      return;
+    } catch (error) {
+      lastError = error;
 
-      console.error('Fallback SMTP send failed', {
-        smtpHost,
-        port: fallbackPort,
-        code: fallbackCode,
-        message: fallbackError instanceof Error ? fallbackError.message : 'Unknown error'
+      const errorCode = (error as Error & { code?: string }).code ?? 'UNKNOWN';
+
+      console.error('SMTP send attempt failed', {
+        host: attempt.host,
+        port: attempt.port,
+        code: errorCode,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        attempt: `${index + 1}/${attempts.length}`
       });
 
-      throw fallbackError;
+      if (!isConnectionLevelError(error)) {
+        throw error;
+      }
     }
   }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('SMTP transporter could not be created');
 };
