@@ -12,6 +12,8 @@ import { pushNotificationToUser } from '../chat/websocket';
 import { ensureRequiredActionNotificationsForUser } from '../notification/notification.service';
 import type { ApplicationDocumentType, ReapplyApplicationDto, SubmitApplicationDto } from './application.validation';
 
+const INITIAL_ONBOARDING_AUTOMATION_DELAY_MS = 10_000;
+
 type SanitizedUser = Omit<User, 'password'>;
 type ApplicationResult = {
   user: SanitizedUser;
@@ -109,6 +111,39 @@ I will be supporting you throughout your ${processLabel}, including guidance on 
 If you need assistance at any point, please send me a message here and I will be glad to help.`;
 };
 
+const scheduleInitialOnboardingAutomation = (
+  userId: string,
+  userFullName: string,
+  applicationType: SubmitApplicationDto['applicationType']
+): void => {
+  setTimeout(() => {
+    void (async () => {
+      const assignedAdmin = await getAssignedAdminForUser();
+
+      if (assignedAdmin) {
+        try {
+          await addConversationMessage(
+            assignedAdmin.id,
+            userId,
+            buildWelcomeMessage(userFullName, assignedAdmin.fullName, applicationType)
+          );
+        } catch (_error) {
+        }
+      }
+
+      const createdSystemNotifications = await ensureRequiredActionNotificationsForUser(userId);
+
+      createdSystemNotifications.forEach((notification) => {
+        pushNotificationToUser(userId, {
+          type: 'notification',
+          notification
+        });
+      });
+    })().catch((_error) => {
+    });
+  }, INITIAL_ONBOARDING_AUTOMATION_DELAY_MS);
+};
+
 export const submitApplication = async (payload: SubmitApplicationDto): Promise<ApplicationResult> => {
   const existing = await prisma.user.findUnique({ where: { email: payload.email } });
   if (existing) {
@@ -163,33 +198,13 @@ export const submitApplication = async (payload: SubmitApplicationDto): Promise<
 
   const jwtPayload = { userId: user.id, email: user.email, role: user.role };
 
-  const assignedAdmin = await getAssignedAdminForUser();
-
-  if (assignedAdmin) {
-    try {
-      await addConversationMessage(
-        assignedAdmin.id,
-        user.id,
-        buildWelcomeMessage(user.fullName, assignedAdmin.fullName, payload.applicationType)
-      );
-    } catch (_error) {
-    }
-  }
+  scheduleInitialOnboardingAutomation(user.id, user.fullName, payload.applicationType);
 
   try {
     await sendEmailVerification(user.id);
   } catch (error) {
     console.error('Failed to send verification email after application submission', error);
   }
-
-  const createdSystemNotifications = await ensureRequiredActionNotificationsForUser(user.id);
-
-  createdSystemNotifications.forEach((notification) => {
-    pushNotificationToUser(user.id, {
-      type: 'notification',
-      notification
-    });
-  });
 
   return {
     user: sanitizeUser(user),

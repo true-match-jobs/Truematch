@@ -77,7 +77,17 @@ export const LoginPage = () => {
 
             <div className="pt-2">
               <Button type="submit" fullWidth disabled={submitting}>
-                {submitting ? 'Signing in...' : 'Sign In'}
+                {submitting ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                      aria-hidden
+                    />
+                    <span>Signing in...</span>
+                  </span>
+                ) : (
+                  'Sign In'
+                )}
               </Button>
             </div>
           </form>

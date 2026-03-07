@@ -2,63 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowRight } from '@phosphor-icons/react';
-import { motion, useReducedMotion } from 'framer-motion';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { authService } from '../../services/auth.service';
 import { useChatNotificationStore } from '../../store/chat-notification.store';
 import { useDashboardStore } from '../../store/dashboard.store';
 import { buildInitialAvatarUrl } from '../../utils/avatar';
 
-const WELCOME_MESSAGE_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const WELCOME_HEADING_REVEAL_DELAY_MS = 260;
-
-const getUserFirstName = (fullName?: string | null): string => {
-  const trimmedName = fullName?.trim();
-
-  if (!trimmedName) {
-    return 'there';
-  }
-
-  return trimmedName.split(/\s+/)[0] || 'there';
-};
-
-const buildWelcomeStorageKey = (userId: string): string => `truematch.dashboard.welcome.last-shown-at.${userId}`;
-
-const readWelcomeLastShownAt = (storageKey: string): number | null => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  const rawValue = window.localStorage.getItem(storageKey);
-
-  if (!rawValue) {
-    return null;
-  }
-
-  const parsedValue = Number(rawValue);
-
-  if (!Number.isFinite(parsedValue)) {
-    return null;
-  }
-
-  return parsedValue;
-};
-
-const writeWelcomeLastShownAt = (storageKey: string, timestamp: number): void => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.localStorage.setItem(storageKey, String(timestamp));
-};
-
 export const DashboardHome = () => {
   const { profile, isLoading: loading, errorMessage, refreshDashboardData } = useDashboardData();
   const [copiedApplicationId, setCopiedApplicationId] = useState<string | null>(null);
-  const [dashboardHeading, setDashboardHeading] = useState('Hi, there!');
-  const [isHeadingVisible, setIsHeadingVisible] = useState(false);
-  const [isFirstDashboardVisit, setIsFirstDashboardVisit] = useState<boolean | null>(null);
-  const shouldReduceMotion = useReducedMotion();
   const navigate = useNavigate();
 
   const applications = profile?.applications ?? (profile?.application ? [profile.application] : []);
@@ -134,60 +86,6 @@ export const DashboardHome = () => {
   }, [profile]);
 
   useEffect(() => {
-    if (!profile || isFirstDashboardVisit !== null) {
-      return;
-    }
-
-    setIsFirstDashboardVisit(!profile.hasVisitedDashboard);
-  }, [profile, isFirstDashboardVisit]);
-
-  useEffect(() => {
-    if (!profile) {
-      setDashboardHeading('Hi, there!');
-      return;
-    }
-
-    const firstName = getUserFirstName(profile.fullName);
-    const now = Date.now();
-    const storageKey = buildWelcomeStorageKey(profile.id);
-    const defaultHeading = `Hi, ${firstName}!`;
-
-    if (isFirstDashboardVisit) {
-      setDashboardHeading(`Welcome, ${firstName}!`);
-      writeWelcomeLastShownAt(storageKey, now);
-      return;
-    }
-
-    const lastShownAt = readWelcomeLastShownAt(storageKey);
-    const shouldShowWelcomeBack = !lastShownAt || now - lastShownAt >= WELCOME_MESSAGE_INTERVAL_MS;
-
-    if (shouldShowWelcomeBack) {
-      setDashboardHeading(`Welcome back, ${firstName}!`);
-      writeWelcomeLastShownAt(storageKey, now);
-      return;
-    }
-
-    setDashboardHeading(defaultHeading);
-  }, [profile, isFirstDashboardVisit]);
-
-  useEffect(() => {
-    if (shouldReduceMotion) {
-      setIsHeadingVisible(true);
-      return;
-    }
-
-    setIsHeadingVisible(false);
-
-    const timer = window.setTimeout(() => {
-      setIsHeadingVisible(true);
-    }, WELCOME_HEADING_REVEAL_DELAY_MS);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [dashboardHeading, shouldReduceMotion]);
-
-  useEffect(() => {
     const assignedAdminId = assignedAdmin?.id;
 
     if (!assignedAdminId) {
@@ -257,17 +155,7 @@ export const DashboardHome = () => {
   return (
     <div className="h-full overflow-y-auto px-3 pt-5 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:px-5">
       <div className="min-h-[3.25rem]">
-        {isHeadingVisible ? (
-          <motion.div
-            key={dashboardHeading}
-            initial={shouldReduceMotion ? undefined : { opacity: 0, y: 8 }}
-            animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0 }}
-            transition={shouldReduceMotion ? undefined : { duration: 0.38, ease: 'easeOut' }}
-          >
-            <h2 className="text-xl font-semibold tracking-tight text-zinc-100">{dashboardHeading}</h2>
-            <p className="mt-1 text-sm text-zinc-400">Track your applications, updates, and next steps from one place.</p>
-          </motion.div>
-        ) : null}
+        <p className="text-sm text-zinc-400">Track your applications, updates, and next steps from one place.</p>
       </div>
       <div className="mt-10 pb-10">
 

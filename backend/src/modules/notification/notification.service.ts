@@ -94,6 +94,7 @@ const mapNotification = (
 };
 
 const REQUIRED_ACTION_WRITE_MAX_RETRIES = 3;
+const INITIAL_REQUIRED_ACTION_DELAY_MS = 10_000;
 
 const ensureSingleSystemNotificationsForMessages = async (
   userId: string,
@@ -373,6 +374,7 @@ export const ensureRequiredActionNotificationsForUser = async (userId: string): 
     select: {
       id: true,
       role: true,
+      createdAt: true,
       emailVerifiedAt: true,
       applications: {
         select: {
@@ -395,6 +397,10 @@ export const ensureRequiredActionNotificationsForUser = async (userId: string): 
   });
 
   if (!user || user.role !== 'USER') {
+    return [];
+  }
+
+  if (Date.now() - user.createdAt.getTime() < INITIAL_REQUIRED_ACTION_DELAY_MS) {
     return [];
   }
 

@@ -60,7 +60,17 @@ export const StepEmailPassword = ({ onSubmit, onBack, loading, initialValues }: 
           Back
         </Button>
         <Button type="submit" fullWidth disabled={isSubmitDisabled}>
-          {loading ? 'Submitting...' : 'Submit Application'}
+          {loading ? (
+            <span className="inline-flex items-center gap-2">
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                aria-hidden
+              />
+              <span>Submitting...</span>
+            </span>
+          ) : (
+            'Submit Application'
+          )}
         </Button>
       </div>
     </form>
