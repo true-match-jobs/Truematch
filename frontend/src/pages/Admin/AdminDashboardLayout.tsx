@@ -13,9 +13,8 @@ export const AdminDashboardLayout = () => {
   const navigate = useNavigate();
   const isChatRoute = pathname.startsWith('/admin/dashboard/chat');
   const unreadAdminUserIds = useChatNotificationStore((state) => state.unreadAdminUserIds);
-  const connectNotifications = useChatNotificationStore((state) => state.connect);
-  const disconnectNotifications = useChatNotificationStore((state) => state.disconnect);
   const setNotificationContext = useChatNotificationStore((state) => state.setContext);
+  const hydrateUnreadSummary = useChatNotificationStore((state) => state.hydrateUnreadSummary);
   const resetNotifications = useChatNotificationStore((state) => state.reset);
 
   const activePeerUserId = pathname.startsWith('/admin/dashboard/chat/')
@@ -23,16 +22,12 @@ export const AdminDashboardLayout = () => {
     : null;
 
   useEffect(() => {
-    if (!user || user.role !== 'ADMIN') {
+    if (user?.role !== 'ADMIN') {
       return;
     }
 
-    connectNotifications(user);
-
-    return () => {
-      disconnectNotifications();
-    };
-  }, [connectNotifications, disconnectNotifications, user]);
+    void hydrateUnreadSummary();
+  }, [hydrateUnreadSummary, pathname, user?.role]);
 
   useEffect(() => {
     setNotificationContext({

@@ -5,37 +5,23 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { RelativeTime } from '../../components/ui/RelativeTime';
 import { useAuth } from '../../hooks/useAuth';
 import { chatService, type AdminConversation } from '../../services/chat.service';
+import {
+  getConversationListSnapshot,
+  setConversationListSnapshot,
+  shouldRefetchConversationList,
+  subscribeToConversationList
+} from '../../store/conversation-cache.store';
 import { useChatNotificationStore } from '../../store/chat-notification.store';
 import { buildInitialAvatarUrl } from '../../utils/avatar';
 
 const ADMIN_CONVERSATIONS_CACHE_TTL_MS = 60_000;
 
-let adminConversationsCache: {
-  conversations: AdminConversation[];
-  cachedAt: number;
-} | null = null;
-
-const getCachedAdminConversations = (): AdminConversation[] | null => {
-  if (!adminConversationsCache) {
-    return null;
-  }
-
-  const isFresh = Date.now() - adminConversationsCache.cachedAt < ADMIN_CONVERSATIONS_CACHE_TTL_MS;
-
-  return isFresh ? adminConversationsCache.conversations : null;
-};
-
-const setCachedAdminConversations = (conversations: AdminConversation[]): void => {
-  adminConversationsCache = {
-    conversations,
-    cachedAt: Date.now()
-  };
-};
-
 export const AdminDashboardConversationsPage = () => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<AdminConversation[]>(() => getCachedAdminConversations() ?? []);
-  const [isLoading, setIsLoading] = useState(() => !getCachedAdminConversations());
+  const [conversations, setConversations] = useState<AdminConversation[]>(() => getConversationListSnapshot('ADMIN'));
+  const [isLoading, setIsLoading] = useState(
+    () => shouldRefetchConversationList('ADMIN', ADMIN_CONVERSATIONS_CACHE_TTL_MS) && !getConversationListSnapshot('ADMIN').length
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedConversationUserIds, setSelectedConversationUserIds] = useState<string[]>([]);
@@ -63,6 +49,12 @@ export const AdminDashboardConversationsPage = () => {
   }, [conversations, presenceByUserId]);
 
   useEffect(() => {
+    return subscribeToConversationList('ADMIN', (nextConversations) => {
+      setConversations(nextConversations);
+    });
+  }, []);
+
+  useEffect(() => {
     let isCancelled = false;
 
     const loadConversations = async (showLoading = false) => {
@@ -79,7 +71,7 @@ export const AdminDashboardConversationsPage = () => {
           return;
         }
 
-        setCachedAdminConversations(nextConversations);
+        setConversationListSnapshot('ADMIN', nextConversations, { isDirty: false });
         setConversations(nextConversations);
         setSelectedConversationUserIds((currentSelectedIds) =>
           currentSelectedIds.filter((selectedId) =>
@@ -91,7 +83,9 @@ export const AdminDashboardConversationsPage = () => {
           return;
         }
 
-        setConversations([]);
+        if (!getConversationListSnapshot('ADMIN').length) {
+          setConversations([]);
+        }
         setErrorMessage('Unable to load conversations right now.');
       } finally {
         if (!isCancelled && showLoading) {
@@ -100,10 +94,21 @@ export const AdminDashboardConversationsPage = () => {
       }
     };
 
-    void loadConversations(!getCachedAdminConversations());
+    if (shouldRefetchConversationList('ADMIN', ADMIN_CONVERSATIONS_CACHE_TTL_MS)) {
+      void loadConversations(!getConversationListSnapshot('ADMIN').length);
+    }
+
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      if (!shouldRefetchConversationList('ADMIN', ADMIN_CONVERSATIONS_CACHE_TTL_MS)) {
+        return;
+      }
+
       void loadConversations(false);
-    }, 5000);
+    }, 10_000);
 
     return () => {
       isCancelled = true;
@@ -112,14 +117,15 @@ export const AdminDashboardConversationsPage = () => {
   }, []);
 
   useEffect(() => {
+    setSelectedConversationUserIds((currentSelectedIds) =>
+      currentSelectedIds.filter((selectedId) => conversations.some((conversation) => conversation.user.id === selectedId))
+    );
+  }, [conversations]);
+
+  useEffect(() => {
     const conversationUserIds = Array.from(new Set(conversations.map((conversation) => conversation.user.id)));
 
-    if (!conversationUserIds.length) {
-      subscribeToPresence([]);
-      return;
-    }
-
-    subscribeToPresence(conversationUserIds);
+    return subscribeToPresence(conversationUserIds);
   }, [conversations, subscribeToPresence]);
 
   const selectedCount = selectedConversationUserIds.length;
@@ -160,7 +166,7 @@ export const AdminDashboardConversationsPage = () => {
           (conversation) => !selectedConversationUserIds.includes(conversation.user.id)
         );
 
-        setCachedAdminConversations(nextConversations);
+        setConversationListSnapshot('ADMIN', nextConversations, { isDirty: false });
 
         return nextConversations;
       });
@@ -176,7 +182,7 @@ export const AdminDashboardConversationsPage = () => {
   };
 
   return (
-    <section className="flex h-full min-h-0 flex-col pt-5 pb-3">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto pt-5 pb-3">
       <div className="flex items-center justify-between px-3">
         <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Conversations</h2>
         <div className="flex items-center gap-2">
@@ -228,7 +234,7 @@ export const AdminDashboardConversationsPage = () => {
         </div>
       ) : null}
 
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-4 min-h-0 flex-1 pb-[calc(7rem+env(safe-area-inset-bottom))]">
         {isLoading ? <LoadingSpinner className="py-10" /> : null}
         {!isLoading && errorMessage ? <p className="px-3 py-2 text-sm text-rose-400">{errorMessage}</p> : null}
         {!isLoading && !errorMessage && !conversations.length ? (

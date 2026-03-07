@@ -4,36 +4,19 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { RelativeTime } from '../../components/ui/RelativeTime';
 import { useAuth } from '../../hooks/useAuth';
 import { chatService, decodeAttachmentMessageContent, type AdminConversation } from '../../services/chat.service';
+import {
+  getConversationListSnapshot,
+  setConversationListSnapshot,
+  setUserConversationUnreadCount,
+  shouldRefetchConversationList,
+  subscribeToConversationList
+} from '../../store/conversation-cache.store';
 import { useChatNotificationStore } from '../../store/chat-notification.store';
 import { buildInitialAvatarUrl } from '../../utils/avatar';
 
-type UserConversationPreview = AdminConversation & {
-  lastMessageFromUserId: string;
-};
+type UserConversationPreview = AdminConversation;
 
 const USER_CONVERSATIONS_CACHE_TTL_MS = 60_000;
-
-let userConversationsCache: {
-  conversations: UserConversationPreview[];
-  cachedAt: number;
-} | null = null;
-
-const getCachedUserConversations = (): UserConversationPreview[] | null => {
-  if (!userConversationsCache) {
-    return null;
-  }
-
-  const isFresh = Date.now() - userConversationsCache.cachedAt < USER_CONVERSATIONS_CACHE_TTL_MS;
-
-  return isFresh ? userConversationsCache.conversations : null;
-};
-
-const setCachedUserConversations = (conversations: UserConversationPreview[]): void => {
-  userConversationsCache = {
-    conversations,
-    cachedAt: Date.now()
-  };
-};
 
 const formatLastMessagePreview = (content: string): string => {
   const decodedAttachment = decodeAttachmentMessageContent(content);
@@ -47,8 +30,10 @@ const formatLastMessagePreview = (content: string): string => {
 
 export const DashboardConversationsPage = () => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<UserConversationPreview[]>(() => getCachedUserConversations() ?? []);
-  const [isLoading, setIsLoading] = useState(() => !getCachedUserConversations());
+  const [conversations, setConversations] = useState<UserConversationPreview[]>(() => getConversationListSnapshot('USER'));
+  const [isLoading, setIsLoading] = useState(
+    () => shouldRefetchConversationList('USER', USER_CONVERSATIONS_CACHE_TTL_MS) && !getConversationListSnapshot('USER').length
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const unreadUserMessageCount = useChatNotificationStore((state) => state.unreadUserMessageCount);
   const presenceByUserId = useChatNotificationStore((state) => state.presenceByUserId);
@@ -72,6 +57,12 @@ export const DashboardConversationsPage = () => {
   }, [conversations, presenceByUserId]);
 
   useEffect(() => {
+    return subscribeToConversationList('USER', (nextConversations) => {
+      setConversations(nextConversations);
+    });
+  }, []);
+
+  useEffect(() => {
     let isCancelled = false;
 
     const loadConversations = async (showLoading = false) => {
@@ -90,7 +81,7 @@ export const DashboardConversationsPage = () => {
         }
 
         if (!history.length) {
-          setCachedUserConversations([]);
+          setConversationListSnapshot('USER', [], { isDirty: false });
           setConversations([]);
           return;
         }
@@ -106,14 +97,16 @@ export const DashboardConversationsPage = () => {
           }
         ];
 
-        setCachedUserConversations(nextConversations);
+        setConversationListSnapshot('USER', nextConversations, { isDirty: false });
         setConversations(nextConversations);
       } catch (_error) {
         if (isCancelled) {
           return;
         }
 
-        setConversations([]);
+        if (!getConversationListSnapshot('USER').length) {
+          setConversations([]);
+        }
         setErrorMessage('Unable to load conversations right now.');
       } finally {
         if (!isCancelled && showLoading) {
@@ -122,33 +115,43 @@ export const DashboardConversationsPage = () => {
       }
     };
 
-    void loadConversations(!getCachedUserConversations());
+    if (shouldRefetchConversationList('USER', USER_CONVERSATIONS_CACHE_TTL_MS)) {
+      void loadConversations(!getConversationListSnapshot('USER').length);
+    }
+
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      if (!shouldRefetchConversationList('USER', USER_CONVERSATIONS_CACHE_TTL_MS)) {
+        return;
+      }
+
       void loadConversations(false);
-    }, 5000);
+    }, 10_000);
 
     return () => {
       isCancelled = true;
       window.clearInterval(intervalId);
     };
+  }, []);
+
+  useEffect(() => {
+    setUserConversationUnreadCount(unreadUserMessageCount);
   }, [unreadUserMessageCount]);
 
   useEffect(() => {
     const conversationUserIds = Array.from(new Set(conversations.map((conversation) => conversation.user.id)));
 
-    if (!conversationUserIds.length) {
-      subscribeToPresence([]);
-      return;
-    }
-
-    subscribeToPresence(conversationUserIds);
+    return subscribeToPresence(conversationUserIds);
   }, [conversations, subscribeToPresence]);
 
   return (
-    <section className="flex h-full min-h-0 flex-col pt-5 pb-3">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto pt-5 pb-3">
       <h2 className="text-xl font-semibold tracking-tight text-zinc-100 px-3">Conversations</h2>
 
-      <div className="mt-4 min-h-0 flex-1 overflow-y-auto">
+      <div className="mt-4 min-h-0 flex-1">
         {isLoading ? <LoadingSpinner className="py-10" /> : null}
         {!isLoading && errorMessage ? <p className="px-3 py-2 text-sm text-rose-400">{errorMessage}</p> : null}
         {!isLoading && !errorMessage && !conversations.length ? (

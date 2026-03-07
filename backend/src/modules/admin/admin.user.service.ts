@@ -59,12 +59,39 @@ export const deleteUserByIdForAdmin = async (userId: string): Promise<void> => {
   }
 
   await prisma.$transaction(async (transaction) => {
+    // Explicitly remove all user-owned or user-linked rows so deletion works
+    // even if foreign-key cascade behavior is missing in a deployed database.
+    await transaction.chatMessage.deleteMany({
+      where: {
+        OR: [{ fromUserId: userId }, { toUserId: userId }]
+      }
+    });
+
+    await transaction.notification.deleteMany({
+      where: {
+        OR: [{ recipientUserId: userId }, { senderUserId: userId }]
+      }
+    });
+
+    await transaction.adminConversationClearState.deleteMany({
+      where: {
+        OR: [{ userId }, { adminUserId: userId }]
+      }
+    });
+
     await transaction.application.deleteMany({
       where: { userId }
     });
 
-    await transaction.user.delete({
-      where: { id: userId }
+    const deletedUser = await transaction.user.deleteMany({
+      where: {
+        id: userId,
+        role: 'USER'
+      }
     });
+
+    if (deletedUser.count !== 1) {
+      throw new AppError(404, 'User not found');
+    }
   });
 };

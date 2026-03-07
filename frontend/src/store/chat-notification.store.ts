@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import type { User } from '../types/user';
 import { api } from '../services/api';
 import { chatService } from '../services/chat.service';
+import {
+  applyRealtimeMessageToConversationList,
+  clearAdminConversationUnreadCount,
+  setUserConversationUnreadCount
+} from './conversation-cache.store';
 
 type PrivateMessagePayload = {
   type: 'private_message';
@@ -92,7 +97,7 @@ type ChatNotificationState = {
   context: ChatContext;
   connect: (user: User) => void;
   disconnect: () => void;
-  subscribeToPresence: (userIds: string[]) => void;
+  subscribeToPresence: (userIds: string[]) => (() => void);
   setContext: (context: ChatContext) => void;
   clearUserUnread: () => void;
   clearAdminUnreadForUser: (userId: string) => void;
@@ -107,6 +112,25 @@ let connectionConsumers = 0;
 let reconnectTimeoutId: number | null = null;
 let isReconnecting = false;
 let desiredPresenceUserIds = new Set<string>();
+let presenceSubscriptionsByKey = new Map<string, Set<string>>();
+let presenceSubscriptionCounter = 0;
+
+const buildPresenceSubscriptionKey = (): string => {
+  presenceSubscriptionCounter += 1;
+  return `presence_${presenceSubscriptionCounter}`;
+};
+
+const recomputeDesiredPresenceUserIds = (): void => {
+  const nextDesiredIds = new Set<string>();
+
+  presenceSubscriptionsByKey.forEach((subscriptionIds) => {
+    subscriptionIds.forEach((userId) => {
+      nextDesiredIds.add(userId);
+    });
+  });
+
+  desiredPresenceUserIds = nextDesiredIds;
+};
 
 const getDesiredPresenceUserIds = (): string[] => Array.from(desiredPresenceUserIds);
 
@@ -217,18 +241,33 @@ const setupSocket = async (
 
       const activeUserId = connectedUserId;
       const activeUserRole = connectedUserRole;
+      const context = get().context;
 
       if (!activeUserId || !activeUserRole) {
         return;
       }
+
+      const isIncomingMessage = payload.fromUserId !== activeUserId;
+      const isActiveUserConversationOpen =
+        context.isOnChatTab &&
+        Boolean(context.activePeerUserId) &&
+        (context.activePeerUserId === payload.fromUserId || context.activePeerUserId === payload.toUserId);
+
+      applyRealtimeMessageToConversationList({
+        audience: activeUserRole,
+        activeUserId,
+        fromUserId: payload.fromUserId,
+        toUserId: payload.toUserId,
+        content: payload.content,
+        createdAt: payload.createdAt,
+        shouldIncrementUnread: isIncomingMessage && !(activeUserRole === 'USER' && isActiveUserConversationOpen)
+      });
 
       if (payload.fromUserId === activeUserId) {
         return;
       }
 
       if (activeUserRole === 'USER') {
-        const context = get().context;
-
         if (context.isOnChatTab && context.activePeerUserId === payload.fromUserId) {
           return;
         }
@@ -312,6 +351,7 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
     connectionConsumers += 1;
 
     if (alreadyConnected) {
+      void get().hydrateUnreadSummary();
       return;
     }
 
@@ -332,12 +372,16 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
   },
 
   subscribeToPresence: (userIds) => {
-    desiredPresenceUserIds = new Set(
+    const subscriptionKey = buildPresenceSubscriptionKey();
+    const normalizedIds = new Set(
       userIds
         .filter((value) => typeof value === 'string')
         .map((value) => value.trim())
         .filter((value) => value.length > 0)
     );
+
+    presenceSubscriptionsByKey.set(subscriptionKey, normalizedIds);
+    recomputeDesiredPresenceUserIds();
 
     set((state) => {
       const nextPresenceByUserId = { ...state.presenceByUserId };
@@ -354,6 +398,27 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
     });
 
     sendPresenceSubscription();
+
+    return () => {
+      presenceSubscriptionsByKey.delete(subscriptionKey);
+      recomputeDesiredPresenceUserIds();
+
+      set((state) => {
+        const nextPresenceByUserId = { ...state.presenceByUserId };
+
+        getDesiredPresenceUserIds().forEach((userId) => {
+          if (typeof nextPresenceByUserId[userId] !== 'boolean') {
+            nextPresenceByUserId[userId] = false;
+          }
+        });
+
+        return {
+          presenceByUserId: nextPresenceByUserId
+        };
+      });
+
+      sendPresenceSubscription();
+    };
   },
 
   setContext: (context) => {
@@ -362,12 +427,14 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
 
   clearUserUnread: () => {
     set({ unreadUserMessageCount: 0 });
+    setUserConversationUnreadCount(0);
   },
 
   clearAdminUnreadForUser: (userId) => {
     set((state) => ({
       unreadAdminUserIds: state.unreadAdminUserIds.filter((currentUserId) => currentUserId !== userId)
     }));
+    clearAdminConversationUnreadCount(userId);
   },
 
   hydrateUnreadSummary: async () => {
@@ -380,6 +447,7 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
 
       if (connectedUserRole === 'USER') {
         set({ unreadUserMessageCount: summary.userUnreadMessageCount });
+        setUserConversationUnreadCount(summary.userUnreadMessageCount);
         return;
       }
 
@@ -392,6 +460,8 @@ export const useChatNotificationStore = create<ChatNotificationState>((set, get)
   reset: () => {
     connectionConsumers = 0;
     desiredPresenceUserIds = new Set<string>();
+    presenceSubscriptionsByKey = new Map<string, Set<string>>();
+    presenceSubscriptionCounter = 0;
     closeSocket();
     set({
       unreadUserMessageCount: 0,

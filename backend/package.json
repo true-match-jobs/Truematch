@@ -15,7 +15,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "user:create": "tsx src/scripts/create-user.ts"
+    "user:create": "tsx src/scripts/create-user.ts",
+    "chat:trim-history": "tsx src/scripts/trim-chat-history.ts",
+    "chat:trim-history:dry-run": "tsx src/scripts/trim-chat-history.ts --dry-run"
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",

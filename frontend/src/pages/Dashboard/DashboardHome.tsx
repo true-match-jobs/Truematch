@@ -88,12 +88,8 @@ export const DashboardHome = () => {
   useEffect(() => {
     const assignedAdminId = assignedAdmin?.id;
 
-    if (!assignedAdminId) {
-      subscribeToPresence([]);
-      return;
-    }
 
-    subscribeToPresence([assignedAdminId]);
+    return subscribeToPresence(assignedAdminId ? [assignedAdminId] : []);
   }, [assignedAdmin?.id, subscribeToPresence]);
 
   useEffect(() => {

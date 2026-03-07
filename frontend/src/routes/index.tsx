@@ -1,7 +1,8 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { useChatNotificationStore } from '../store/chat-notification.store';
 
 const AdminApplicationDetailsPage = lazy(() =>
   import('../pages/Admin/AdminApplicationDetailsPage').then((module) => ({ default: module.AdminApplicationDetailsPage }))
@@ -61,7 +62,30 @@ const LogoGeneratorPage = lazy(() =>
 );
 
 const ProtectedRoute = () => {
-  const { isAuthenticated, isBootstrapping } = useAuth();
+  const { user, isAuthenticated, isBootstrapping } = useAuth();
+  const connectNotifications = useChatNotificationStore((state) => state.connect);
+  const disconnectNotifications = useChatNotificationStore((state) => state.disconnect);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id || !user.role || !user.email) {
+      return;
+    }
+
+    connectNotifications(user);
+
+    return () => {
+      disconnectNotifications();
+    };
+  }, [
+    connectNotifications,
+    disconnectNotifications,
+    isAuthenticated,
+    user?.email,
+    user?.fullName,
+    user?.hasVisitedDashboard,
+    user?.id,
+    user?.role
+  ]);
 
   if (isBootstrapping) {
     return <LoadingSpinner className="min-h-screen" />;

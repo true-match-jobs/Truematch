@@ -23,10 +23,9 @@ export const DashboardLayout = () => {
   const isDashboardHomeRoute = pathname === '/dashboard';
   const activePeerUserId = pathname.startsWith('/dashboard/chat/') ? pathname.replace('/dashboard/chat/', '').split('/')[0] || null : null;
   const unreadMessageCount = useChatNotificationStore((state) => state.unreadUserMessageCount);
-  const connectNotifications = useChatNotificationStore((state) => state.connect);
-  const disconnectNotifications = useChatNotificationStore((state) => state.disconnect);
   const setNotificationContext = useChatNotificationStore((state) => state.setContext);
   const clearUserUnread = useChatNotificationStore((state) => state.clearUserUnread);
+  const hydrateUnreadSummary = useChatNotificationStore((state) => state.hydrateUnreadSummary);
   const resetNotifications = useChatNotificationStore((state) => state.reset);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [homeWelcomeMessageText, setHomeWelcomeMessageText] = useState('');
@@ -35,16 +34,12 @@ export const DashboardLayout = () => {
   const userFirstName = user?.fullName?.trim().split(/\s+/)[0] ?? 'Applicant';
 
   useEffect(() => {
-    if (!user || user.role !== 'USER') {
+    if (user?.role !== 'USER') {
       return;
     }
 
-    connectNotifications(user);
-
-    return () => {
-      disconnectNotifications();
-    };
-  }, [connectNotifications, disconnectNotifications, user]);
+    void hydrateUnreadSummary();
+  }, [hydrateUnreadSummary, pathname, user?.role]);
 
   useEffect(() => {
     setNotificationContext({

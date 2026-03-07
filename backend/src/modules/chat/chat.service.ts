@@ -8,6 +8,7 @@ import { AppError } from '../../utils/app-error';
 const unreadFilter = { isRead: false } as Record<string, boolean>;
 const readUpdate = { isRead: true } as Record<string, boolean>;
 const ATTACHMENT_PREFIX = '[ATTACHMENT]';
+const CONVERSATION_MESSAGE_RETAIN_LIMIT = 50;
 
 type ChatUser = {
   id: string;
@@ -165,21 +166,62 @@ export const addConversationMessage = async (fromUserId: string, toUserId: strin
     throw new AppError(400, 'Message content is required');
   }
 
-  const createdMessage = await prisma.chatMessage.create({
-    data: {
-      id: randomUUID(),
-      fromUserId,
-      toUserId,
-      content: sanitizedContent
-    },
-    select: {
-      id: true,
-      fromUserId: true,
-      toUserId: true,
-      content: true,
-      isRead: true,
-      createdAt: true
+  const createdMessage = await prisma.$transaction(async (tx) => {
+    const insertedMessage = await tx.chatMessage.create({
+      data: {
+        id: randomUUID(),
+        fromUserId,
+        toUserId,
+        content: sanitizedContent
+      },
+      select: {
+        id: true,
+        fromUserId: true,
+        toUserId: true,
+        content: true,
+        isRead: true,
+        createdAt: true
+      }
+    });
+
+    const oldMessagesToDelete = await tx.chatMessage.findMany({
+      where: {
+        OR: [
+          {
+            fromUserId,
+            toUserId
+          },
+          {
+            fromUserId: toUserId,
+            toUserId: fromUserId
+          }
+        ]
+      },
+      orderBy: [
+        {
+          createdAt: 'desc'
+        },
+        {
+          id: 'desc'
+        }
+      ],
+      skip: CONVERSATION_MESSAGE_RETAIN_LIMIT,
+      select: {
+        id: true
+      }
+    });
+
+    if (oldMessagesToDelete.length > 0) {
+      await tx.chatMessage.deleteMany({
+        where: {
+          id: {
+            in: oldMessagesToDelete.map((message) => message.id)
+          }
+        }
+      });
     }
+
+    return insertedMessage;
   });
 
   return {
