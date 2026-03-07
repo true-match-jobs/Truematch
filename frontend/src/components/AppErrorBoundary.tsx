@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { LoadingSpinner } from './ui/LoadingSpinner';
 
 const DYNAMIC_IMPORT_RELOAD_KEY = 'truematch:dynamic-import-reload-ts';
 const DYNAMIC_IMPORT_RELOAD_COOLDOWN_MS = 15_000;
@@ -79,7 +80,7 @@ export class AppErrorBoundary extends Component<Props, State> {
           aria-live="polite"
           aria-busy="true"
         >
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-600 border-t-zinc-100" aria-label="Loading" />
+          <LoadingSpinner className="py-0" sizeClassName="h-8 w-8 border-2" />
         </div>
       );
     }

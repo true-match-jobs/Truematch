@@ -58,8 +58,8 @@ const isTimeoutError = (error: unknown): boolean => {
   return error.message.toLowerCase().includes('timeout');
 };
 
-const getPortSequence = (): number[] => {
-  const configuredPort = env.SMTP_PORT;
+const getPortSequence = (): [number, number] => {
+  const configuredPort = env.SMTP_PORT ?? 465;
   const fallbackPort = configuredPort === 465 ? 587 : 465;
 
   return [configuredPort, fallbackPort];

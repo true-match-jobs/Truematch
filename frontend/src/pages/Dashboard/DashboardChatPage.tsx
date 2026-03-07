@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { PdfPreview } from '../../components/chat/PdfPreview';
 import { ChatHeader } from '../../components/chat/ChatHeader';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useViewportHeight } from '../../hooks/useViewportHeight';
 import {
   chatService,
@@ -655,7 +656,9 @@ export const DashboardChatPage = () => {
       />
 
       <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
-        <div className="flex min-h-full flex-col justify-end gap-4">
+        <div className={isLoadingConversation ? 'flex min-h-full items-center justify-center' : 'flex min-h-full flex-col justify-end gap-4'}>
+          {isLoadingConversation ? <LoadingSpinner className="py-0" sizeClassName="h-8 w-8 border-2" /> : null}
+
           {!isLoadingConversation && errorMessage ? <p className="text-sm text-rose-400">{errorMessage}</p> : null}
 
           {!isLoadingConversation && !errorMessage && !messages.length ? (
