@@ -1,0 +1,165 @@
+TrueMatch Public Application API - Setup Guide for React (Vite) + Node Backend
+
+Purpose
+Use this API from your Node.js backend to fetch limited applicant details for contract generation.
+
+Do NOT call TrueMatch directly from React.
+Reason: CONTRACT_API_KEY must stay secret on the backend.
+
+Endpoint (TrueMatch)
+GET {TRUEMATCH_API_BASE_URL}/public/applications/:applicationId
+
+Required Header
+Authorization: Bearer {CONTRACT_API_KEY}
+
+Expected Success Response (200)
+{
+  "application_id": "<id>",
+  "full_name": "John Doe",
+  "nationality": "Nigeria",
+  "skill_or_profession": "Electrician",
+  "work_country": "Canada"
+}
+
+Error Responses
+401 Unauthorized -> Missing/invalid API key
+404 Not Found -> Application ID does not exist
+
+----------------------------------------
+1) Backend Env Vars (Node.js Service)
+----------------------------------------
+Add these to your Node backend .env:
+
+TRUEMATCH_API_BASE_URL=https://api.yourdomain.com
+CONTRACT_API_KEY=<same key configured in TrueMatch backend>
+CONTRACT_API_TIMEOUT_MS=10000
+
+Notes:
+- Never expose CONTRACT_API_KEY in frontend code.
+- Use HTTPS only.
+
+----------------------------------------
+2) Node.js Backend Client (TypeScript)
+----------------------------------------
+Create file: src/integrations/truematchClient.ts
+
+export type ContractApplicationDetails = {
+  application_id: string;
+  full_name: string | null;
+  nationality: string | null;
+  skill_or_profession: string | null;
+  work_country: string | null;
+};
+
+export async function fetchContractApplicationDetails(applicationId: string): Promise<ContractApplicationDetails> {
+  const baseUrl = process.env.TRUEMATCH_API_BASE_URL;
+  const apiKey = process.env.CONTRACT_API_KEY;
+  const timeoutMs = Number(process.env.CONTRACT_API_TIMEOUT_MS ?? 10000);
+
+  if (!baseUrl) throw new Error('Missing TRUEMATCH_API_BASE_URL');
+  if (!apiKey) throw new Error('Missing CONTRACT_API_KEY');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(`${baseUrl}/public/applications/${encodeURIComponent(applicationId)}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: 'application/json'
+      },
+      signal: controller.signal
+    });
+
+    if (response.status === 401) throw new Error('Unauthorized: invalid CONTRACT_API_KEY');
+    if (response.status === 404) throw new Error(`Application not found: ${applicationId}`);
+    if (!response.ok) throw new Error(`TrueMatch API error ${response.status}: ${await response.text()}`);
+
+    return (await response.json()) as ContractApplicationDetails;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+----------------------------------------
+3) Node.js Backend Route Example
+----------------------------------------
+Create endpoint in your service that React can call safely:
+
+GET /api/contracts/application/:applicationId
+
+Example Express handler:
+
+import express from 'express';
+import { fetchContractApplicationDetails } from '../integrations/truematchClient';
+
+const router = express.Router();
+
+router.get('/api/contracts/application/:applicationId', async (req, res) => {
+  try {
+    const details = await fetchContractApplicationDetails(req.params.applicationId);
+    res.status(200).json(details);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+
+    if (message.includes('Unauthorized')) {
+      res.status(502).json({ message: 'Upstream auth failed' });
+      return;
+    }
+
+    if (message.includes('not found')) {
+      res.status(404).json({ message: 'Application not found' });
+      return;
+    }
+
+    res.status(502).json({ message: 'Failed to fetch application details' });
+  }
+});
+
+export default router;
+
+----------------------------------------
+4) React + Vite Frontend Usage
+----------------------------------------
+In React, call your own backend route (NOT TrueMatch directly):
+
+const response = await fetch(`/api/contracts/application/${applicationId}`);
+if (!response.ok) throw new Error('Failed to load application details');
+const data = await response.json();
+
+If frontend and backend are on different domains, use Vite env var for your backend URL:
+
+VITE_BACKEND_BASE_URL=https://contracts.yourdomain.com
+
+Then call:
+
+await fetch(`${import.meta.env.VITE_BACKEND_BASE_URL}/api/contracts/application/${applicationId}`)
+
+----------------------------------------
+5) cURL Test (Backend-to-TrueMatch)
+----------------------------------------
+curl -i \
+  -H "Authorization: Bearer $CONTRACT_API_KEY" \
+  "$TRUEMATCH_API_BASE_URL/public/applications/<APPLICATION_ID>"
+
+----------------------------------------
+6) Prompt For GPT-5.3-Codex (Copy/Paste)
+----------------------------------------
+Project stack: React.js + TypeScript + Vite frontend, Node.js + TypeScript backend.
+
+Implement TrueMatch integration with these rules:
+- Keep CONTRACT_API_KEY only in Node backend env.
+- Add backend env vars: TRUEMATCH_API_BASE_URL, CONTRACT_API_KEY, CONTRACT_API_TIMEOUT_MS=10000.
+- Create backend utility: fetchContractApplicationDetails(applicationId: string) that calls:
+  GET /public/applications/:applicationId on TrueMatch
+  with Authorization: Bearer <CONTRACT_API_KEY>.
+- Parse and return exactly these fields:
+  application_id, full_name, nationality, skill_or_profession, work_country.
+- Add backend route:
+  GET /api/contracts/application/:applicationId
+  that uses this utility and maps upstream failures to safe client responses.
+- Update frontend to call only this backend route (never call TrueMatch directly).
+- Add tests:
+  1 success case, 1 not-found case.
+- Do not add unnecessary dependencies.

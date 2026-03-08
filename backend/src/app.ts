@@ -11,6 +11,7 @@ import { courseRouter } from './modules/course/course.routes';
 import { jobRouter } from './modules/job/job.routes';
 import { universityRouter } from './modules/university/university.routes';
 import { userRouter } from './modules/user/user.routes';
+import { publicApplicationRouter } from './routes/publicApplicationRoutes';
 import { errorMiddleware } from './middleware/error.middleware';
 
 export const app = express();
@@ -57,5 +58,6 @@ app.use('/api/v1/applications', applicationRouter);
 app.use('/api/v1/jobs', jobRouter);
 app.use('/api/v1/courses', courseRouter);
 app.use('/api/v1/universities', universityRouter);
+app.use('/public', publicApplicationRouter);
 
 app.use(errorMiddleware);
