@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Checks, Clock } from '@phosphor-icons/react';
 import { decodeAttachmentMessageContent, type ChatAttachment, type ChatRole, type ChatUser } from '../../services/chat.service';
 import { PdfPreview } from './PdfPreview';
@@ -67,7 +67,31 @@ export const ChatMessagesPane = ({
   onPdfDownload,
   onPreviewImage
 }: ChatMessagesPaneProps) => {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [loadedImageKeys, setLoadedImageKeys] = useState<Record<string, boolean>>({});
+  const [hasInitialBottomPosition, setHasInitialBottomPosition] = useState(false);
+  const shouldShowLoadingSpinner = isLoadingConversation && messages.length === 0;
+  const shouldHideUntilPositioned = messages.length > 0 && !hasInitialBottomPosition;
+
+  useEffect(() => {
+    setHasInitialBottomPosition(false);
+  }, [peer?.id]);
+
+  useLayoutEffect(() => {
+    if (!messages.length) {
+      setHasInitialBottomPosition(true);
+      return;
+    }
+
+    const container = scrollContainerRef.current;
+
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+
+    messagesEndRef.current?.scrollIntoView({ block: 'end' });
+    setHasInitialBottomPosition(true);
+  }, [messages, messagesEndRef]);
 
   useEffect(() => {
     const activeKeys = new Set<string>();
@@ -100,13 +124,16 @@ export const ChatMessagesPane = ({
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 pt-3 pb-6">
-      <div className={isLoadingConversation ? 'flex min-h-full items-center justify-center' : 'flex min-h-full flex-col justify-end gap-4'}>
-        {isLoadingConversation ? <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : null}
+    <div
+      ref={scrollContainerRef}
+      className={`flex-1 overflow-y-auto px-4 pt-3 pb-6 ${shouldHideUntilPositioned ? 'invisible' : 'visible'}`}
+    >
+      <div className={shouldShowLoadingSpinner ? 'flex min-h-full items-center justify-center' : 'flex min-h-full flex-col justify-end gap-4'}>
+        {shouldShowLoadingSpinner ? <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : null}
 
-        {!isLoadingConversation && errorMessage ? <p className="text-sm text-rose-400">{errorMessage}</p> : null}
+        {!shouldShowLoadingSpinner && errorMessage ? <p className="text-sm text-rose-400">{errorMessage}</p> : null}
 
-        {!isLoadingConversation && !errorMessage && !messages.length ? (
+        {!shouldShowLoadingSpinner && !errorMessage && !messages.length ? (
           <p className="text-sm text-zinc-400">No messages yet. Say hello.</p>
         ) : null}
 
@@ -308,7 +335,7 @@ export const ChatMessagesPane = ({
           );
         })}
 
-        {isPeerTyping && !isLoadingConversation && peer ? (
+        {isPeerTyping && !shouldShowLoadingSpinner && peer ? (
           <div className="flex items-start" role="status" aria-live="polite" aria-label={`${peer.fullName} is typing`}>
             <div className="flex items-center gap-1" aria-hidden>
               <span className="h-2 w-2 rounded-full bg-zinc-100 animate-bounce" style={{ animationDelay: '0ms', animationDuration: '0.9s' }} />

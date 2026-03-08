@@ -14,12 +14,23 @@ import { useChatRealtimeSession } from './useChatRealtimeSession';
 import type { ChatUiMessage, PendingComposerAttachment } from './chat-types';
 
 const CHAT_PAGE_CACHE_TTL_MS = 45_000;
+const PERSISTED_CHAT_CACHE_KEY = 'tm_chat_cache_v1';
+const PERSISTED_CHAT_CACHE_MAX_CONVERSATIONS = 24;
+const PERSISTED_CHAT_CACHE_MAX_MESSAGES_PER_CONVERSATION = 80;
 
 type ConversationCacheEntry = {
   peer: ChatUser;
   messages: ChatUiMessage[];
   cachedAt: number;
 };
+
+type PersistedConversationCacheEntry = {
+  peer: ChatUser;
+  messages: ChatMessage[];
+  cachedAt: number;
+};
+
+type PersistedChatCache = Record<string, PersistedConversationCacheEntry>;
 
 const conversationCache = new Map<string, ConversationCacheEntry>();
 
@@ -45,25 +56,103 @@ const preloadImage = (src: string): Promise<void> => {
   });
 };
 
+const readPersistedChatCache = (): PersistedChatCache => {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(PERSISTED_CHAT_CACHE_KEY);
+
+    if (!raw) {
+      return {};
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+
+    return parsed as PersistedChatCache;
+  } catch {
+    return {};
+  }
+};
+
+const writePersistedChatCache = (cache: PersistedChatCache): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(PERSISTED_CHAT_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+  }
+};
+
+const getPersistedConversation = (conversationCacheKey: string): ConversationCacheEntry | null => {
+  const persistedCache = readPersistedChatCache();
+  const persistedEntry = persistedCache[conversationCacheKey];
+
+  if (!persistedEntry) {
+    return null;
+  }
+
+  return {
+    peer: persistedEntry.peer,
+    messages: persistedEntry.messages.map(toSentMessage),
+    cachedAt: persistedEntry.cachedAt
+  };
+};
+
+const persistConversation = (conversationCacheKey: string, entry: ConversationCacheEntry): void => {
+  const persistedCache = readPersistedChatCache();
+
+  // Keep only stable server messages in persistent storage.
+  const persistedMessages = entry.messages
+    .filter((message) => message.deliveryStatus !== 'pending' && !message.localAttachment)
+    .slice(-PERSISTED_CHAT_CACHE_MAX_MESSAGES_PER_CONVERSATION)
+    .map((message) => ({
+      id: message.id,
+      fromUserId: message.fromUserId,
+      toUserId: message.toUserId,
+      content: message.content,
+      isRead: message.isRead,
+      createdAt: message.createdAt
+    }));
+
+  persistedCache[conversationCacheKey] = {
+    peer: entry.peer,
+    messages: persistedMessages,
+    cachedAt: entry.cachedAt
+  };
+
+  const sortedEntries = Object.entries(persistedCache).sort(([, left], [, right]) => right.cachedAt - left.cachedAt);
+
+  const trimmedCache: PersistedChatCache = {};
+
+  sortedEntries.slice(0, PERSISTED_CHAT_CACHE_MAX_CONVERSATIONS).forEach(([key, value]) => {
+    trimmedCache[key] = value;
+  });
+
+  writePersistedChatCache(trimmedCache);
+};
+
+const getPreferredCachedConversation = (conversationCacheKey: string): ConversationCacheEntry | null => {
+  const inMemoryConversation = conversationCache.get(conversationCacheKey) ?? null;
+  const persistedConversation = getPersistedConversation(conversationCacheKey);
+
+  const preferredCachedConversation = [inMemoryConversation, persistedConversation]
+    .filter((value): value is ConversationCacheEntry => Boolean(value))
+    .sort((left, right) => right.cachedAt - left.cachedAt)[0] ?? null;
+
+  return preferredCachedConversation;
+};
+
 export const useDashboardChatConversation = () => {
   const { user } = useAuth();
   const { conversationId } = useParams<{ conversationId: string }>();
-  const [draft, setDraft] = useState('');
-  const [peer, setPeer] = useState<ChatUser | null>(null);
-  const [messages, setMessages] = useState<ChatUiMessage[]>([]);
-  const [pendingAttachment, setPendingAttachment] = useState<PendingComposerAttachment | null>(null);
-  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
-  const [isLoadingConversation, setIsLoadingConversation] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [downloadingMessageId, setDownloadingMessageId] = useState<string | null>(null);
-  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const trackedLocalUrlsRef = useRef<Set<string>>(new Set());
-  const clearUserUnread = useChatNotificationStore((state) => state.clearUserUnread);
-  const clearAdminUnreadForUser = useChatNotificationStore((state) => state.clearAdminUnreadForUser);
-  const setNotificationContext = useChatNotificationStore((state) => state.setContext);
-  const presenceByUserId = useChatNotificationStore((state) => state.presenceByUserId);
-  const subscribeToPresence = useChatNotificationStore((state) => state.subscribeToPresence);
 
   const requestedPeerUserId = useMemo(() => {
     if (user?.role === 'ADMIN') {
@@ -78,9 +167,36 @@ export const useDashboardChatConversation = () => {
   }, [conversationId, user?.role]);
 
   const conversationCacheKey = useMemo(
-    () => (requestedPeerUserId && requestedPeerUserId.trim().length > 0 ? requestedPeerUserId : '__assigned_admin__'),
-    [requestedPeerUserId]
+    () => {
+      const peerKey = requestedPeerUserId && requestedPeerUserId.trim().length > 0 ? requestedPeerUserId : '__assigned_admin__';
+      const userKey = user?.id ?? '__anonymous__';
+
+      return `${userKey}:${peerKey}`;
+    },
+    [requestedPeerUserId, user?.id]
   );
+
+  const initialCachedConversation = useMemo(
+    () => getPreferredCachedConversation(conversationCacheKey),
+    [conversationCacheKey]
+  );
+
+  const [draft, setDraft] = useState('');
+  const [peer, setPeer] = useState<ChatUser | null>(() => initialCachedConversation?.peer ?? null);
+  const [messages, setMessages] = useState<ChatUiMessage[]>(() => initialCachedConversation?.messages ?? []);
+  const [pendingAttachment, setPendingAttachment] = useState<PendingComposerAttachment | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(() => !initialCachedConversation);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [downloadingMessageId, setDownloadingMessageId] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const trackedLocalUrlsRef = useRef<Set<string>>(new Set());
+  const clearUserUnread = useChatNotificationStore((state) => state.clearUserUnread);
+  const clearAdminUnreadForUser = useChatNotificationStore((state) => state.clearAdminUnreadForUser);
+  const setNotificationContext = useChatNotificationStore((state) => state.setContext);
+  const presenceByUserId = useChatNotificationStore((state) => state.presenceByUserId);
+  const subscribeToPresence = useChatNotificationStore((state) => state.subscribeToPresence);
 
   const isPeerOnline = peer?.id ? Boolean(presenceByUserId[peer.id]) : false;
   const generatedPeerAvatarUrl = buildInitialAvatarUrl({
@@ -101,6 +217,23 @@ export const useDashboardChatConversation = () => {
   });
 
   useEffect(() => {
+    const cachedConversation = getPreferredCachedConversation(conversationCacheKey);
+
+    if (cachedConversation) {
+      setPeer(cachedConversation.peer);
+      setMessages(cachedConversation.messages);
+      setIsLoadingConversation(false);
+      setErrorMessage(null);
+      return;
+    }
+
+    setPeer(null);
+    setMessages([]);
+    setIsLoadingConversation(true);
+    setErrorMessage(null);
+  }, [conversationCacheKey]);
+
+  useEffect(() => {
     let isCancelled = false;
 
     const applyResolvedConversation = async (resolvedPeer: ChatUser) => {
@@ -112,14 +245,16 @@ export const useDashboardChatConversation = () => {
       }
 
       const normalizedHistory = history.map(toSentMessage);
-
-      setPeer(resolvedPeer);
-      setMessages(normalizedHistory);
-      conversationCache.set(conversationCacheKey, {
+      const nextEntry: ConversationCacheEntry = {
         peer: resolvedPeer,
         messages: normalizedHistory,
         cachedAt: Date.now()
-      });
+      };
+
+      setPeer(resolvedPeer);
+      setMessages(normalizedHistory);
+      conversationCache.set(conversationCacheKey, nextEntry);
+      persistConversation(conversationCacheKey, nextEntry);
 
       if (user?.role === 'ADMIN') {
         clearAdminUnreadForUser(resolvedPeer.id);
@@ -133,29 +268,33 @@ export const useDashboardChatConversation = () => {
         return;
       }
 
-      const cachedConversation = conversationCache.get(conversationCacheKey);
-      const isCacheFresh =
-        Boolean(cachedConversation) && Date.now() - (cachedConversation?.cachedAt ?? 0) < CHAT_PAGE_CACHE_TTL_MS;
+      const preferredCachedConversation = getPreferredCachedConversation(conversationCacheKey);
 
-      if (cachedConversation && isCacheFresh) {
-        setPeer(cachedConversation.peer);
-        setMessages(cachedConversation.messages);
+      const isCacheFresh =
+        Boolean(preferredCachedConversation) &&
+        Date.now() - (preferredCachedConversation?.cachedAt ?? 0) < CHAT_PAGE_CACHE_TTL_MS;
+
+      if (preferredCachedConversation) {
+        setPeer(preferredCachedConversation.peer);
+        setMessages(preferredCachedConversation.messages);
         setIsLoadingConversation(false);
         setErrorMessage(null);
 
-        void chatService.markConversationRead(cachedConversation.peer.id);
+        void chatService.markConversationRead(preferredCachedConversation.peer.id);
 
         if (user.role === 'ADMIN') {
-          clearAdminUnreadForUser(cachedConversation.peer.id);
+          clearAdminUnreadForUser(preferredCachedConversation.peer.id);
         } else {
           clearUserUnread();
         }
 
-        // SWR: keep UI instant from cache, then refresh quietly for latest messages.
-        try {
-          await applyResolvedConversation(cachedConversation.peer);
-        } catch (_error) {
-          return;
+        if (navigator.onLine) {
+          // SWR: keep UI instant from cache, then refresh quietly for latest messages.
+          try {
+            await applyResolvedConversation(preferredCachedConversation.peer);
+          } catch (_error) {
+            return;
+          }
         }
 
         return;
@@ -219,6 +358,12 @@ export const useDashboardChatConversation = () => {
       messages,
       cachedAt: Date.now()
     });
+
+    persistConversation(conversationCacheKey, {
+      peer,
+      messages,
+      cachedAt: Date.now()
+    });
   }, [conversationCacheKey, messages, peer]);
 
   useEffect(() => {
@@ -226,10 +371,6 @@ export const useDashboardChatConversation = () => {
 
     return subscribeToPresence(peerUserId ? [peerUserId] : []);
   }, [peer?.id, subscribeToPresence]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages]);
 
   useEffect(() => {
     const nextTrackedUrls = new Set<string>();

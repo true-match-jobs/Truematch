@@ -44,11 +44,14 @@ export const AdminDashboardHome = () => {
   const cachedData = getCachedAdminHomeData();
   const [applications, setApplications] = useState<AdminApplicationListItem[]>(cachedData?.applications ?? []);
   const [totalUsers, setTotalUsers] = useState(cachedData?.totalUsers ?? 0);
+  const [isSummaryLoading, setIsSummaryLoading] = useState(!cachedData);
 
   useEffect(() => {
     let isCancelled = false;
 
     const loadApplications = async () => {
+      setIsSummaryLoading((current) => current || !cachedData);
+
       try {
         const [applicationsResult, usersResult] = await Promise.all([
           applicationService.getAllForAdmin(),
@@ -69,6 +72,10 @@ export const AdminDashboardHome = () => {
 
         setApplications([]);
         setTotalUsers(0);
+      } finally {
+        if (!isCancelled) {
+          setIsSummaryLoading(false);
+        }
       }
     };
 
@@ -91,7 +98,16 @@ export const AdminDashboardHome = () => {
           <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <article className="glass-border rounded-xl bg-dark-card p-5">
               <p className="text-sm text-zinc-400">Total Applications</p>
-              <p className="mt-3 text-2xl font-semibold text-zinc-100">{applications.length}</p>
+              <div className="mt-3 min-h-8 flex items-center">
+                {isSummaryLoading ? (
+                  <span
+                    className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-zinc-500/40 border-t-zinc-200"
+                    aria-label="Loading total applications"
+                  />
+                ) : (
+                  <p className="text-2xl font-semibold text-zinc-100">{applications.length}</p>
+                )}
+              </div>
               <div className="mt-4 flex justify-end">
                 <Link
                   to="/admin/dashboard/applications"
@@ -105,7 +121,16 @@ export const AdminDashboardHome = () => {
 
             <article className="glass-border rounded-xl bg-dark-card p-5">
               <p className="text-sm text-zinc-400">Total Users</p>
-              <p className="mt-3 text-2xl font-semibold text-zinc-100">{totalUsers}</p>
+              <div className="mt-3 min-h-8 flex items-center">
+                {isSummaryLoading ? (
+                  <span
+                    className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-zinc-500/40 border-t-zinc-200"
+                    aria-label="Loading total users"
+                  />
+                ) : (
+                  <p className="text-2xl font-semibold text-zinc-100">{totalUsers}</p>
+                )}
+              </div>
               <div className="mt-4 flex justify-end">
                 <Link
                   to="/admin/dashboard/users"

@@ -23,6 +23,7 @@ export const DashboardHome = () => {
     ],
     [applications.length]
   );
+  const isSummaryLoading = loading && !profile;
 
   const getApplicationDetailsPath = (applicationId: string, applicationType: string) =>
     applicationType === 'work_employment' ? `/applications/${applicationId}/employment` : `/applications/${applicationId}`;
@@ -161,7 +162,16 @@ export const DashboardHome = () => {
             {summaryItems.map((item) => (
               <article key={item.label} className="glass-border rounded-xl bg-dark-card p-5">
                 <p className="text-sm text-zinc-400">{item.label}</p>
-                <p className="mt-3 text-2xl font-semibold text-zinc-100">{item.value}</p>
+                <div className="mt-3 min-h-8 flex items-center">
+                  {isSummaryLoading ? (
+                    <span
+                      className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-zinc-500/40 border-t-zinc-200"
+                      aria-label={`Loading ${item.label.toLowerCase()}`}
+                    />
+                  ) : (
+                    <p className="text-2xl font-semibold text-zinc-100">{item.value}</p>
+                  )}
+                </div>
               </article>
             ))}
           </div>
