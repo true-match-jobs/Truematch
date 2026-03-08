@@ -17,6 +17,7 @@ Expected Success Response (200)
   "application_id": "<id>",
   "full_name": "John Doe",
   "nationality": "Nigeria",
+  "passport_number": "A12345678",
   "skill_or_profession": "Electrician",
   "work_country": "Canada"
 }
@@ -47,6 +48,7 @@ export type ContractApplicationDetails = {
   application_id: string;
   full_name: string | null;
   nationality: string | null;
+  passport_number: string | null;
   skill_or_profession: string | null;
   work_country: string | null;
 };
@@ -136,6 +138,28 @@ Then call:
 
 await fetch(`${import.meta.env.VITE_BACKEND_BASE_URL}/api/contracts/application/${applicationId}`)
 
+Use the passport field in your backend contract payload mapping:
+
+const details = await fetchContractApplicationDetails(applicationId);
+
+const contractPayload = {
+  applicant_full_name: details.full_name ?? '',
+  applicant_nationality: details.nationality ?? '',
+  applicant_passport_number: details.passport_number ?? '',
+  applicant_profession: details.skill_or_profession ?? '',
+  applicant_work_country: details.work_country ?? ''
+};
+
+Example JSON template placeholders for your contract engine:
+
+{
+  "applicant_full_name": "{{applicant_full_name}}",
+  "applicant_nationality": "{{applicant_nationality}}",
+  "applicant_passport_number": "{{applicant_passport_number}}",
+  "applicant_profession": "{{applicant_profession}}",
+  "applicant_work_country": "{{applicant_work_country}}"
+}
+
 ----------------------------------------
 5) cURL Test (Backend-to-TrueMatch)
 ----------------------------------------
@@ -155,7 +179,8 @@ Implement TrueMatch integration with these rules:
   GET /public/applications/:applicationId on TrueMatch
   with Authorization: Bearer <CONTRACT_API_KEY>.
 - Parse and return exactly these fields:
-  application_id, full_name, nationality, skill_or_profession, work_country.
+  application_id, full_name, nationality, passport_number, skill_or_profession, work_country.
+- Map passport_number into your template payload as applicant_passport_number.
 - Add backend route:
   GET /api/contracts/application/:applicationId
   that uses this utility and maps upstream failures to safe client responses.

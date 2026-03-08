@@ -18,7 +18,8 @@ export const getPublicApplicationByIdHandler = async (req: Request, res: Respons
       user: {
         select: {
           fullName: true,
-          nationality: true
+          nationality: true,
+          passportNumber: true
         }
       }
     }
@@ -32,6 +33,7 @@ export const getPublicApplicationByIdHandler = async (req: Request, res: Respons
     application_id: application.id,
     full_name: application.user.fullName,
     nationality: application.user.nationality,
+    passport_number: application.user.passportNumber,
     skill_or_profession: application.skillOrProfession,
     work_country: application.workCountry
   });

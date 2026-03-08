@@ -75,6 +75,7 @@ export const AdminApplicationDetailsPage = () => {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [showStatusSuccessToast, setShowStatusSuccessToast] = useState(false);
   const [copiedUserEmail, setCopiedUserEmail] = useState<string | null>(null);
+  const [copiedApplicationId, setCopiedApplicationId] = useState<string | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -221,6 +222,21 @@ export const AdminApplicationDetailsPage = () => {
     }
   };
 
+  const handleCopyApplicationId = async (event: React.MouseEvent<HTMLButtonElement>, id: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopiedApplicationId(id);
+      window.setTimeout(() => {
+        setCopiedApplicationId(null);
+      }, 1400);
+    } catch (_error) {
+      setCopiedApplicationId(null);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-dark-bg">
       <Navbar />
@@ -287,6 +303,27 @@ export const AdminApplicationDetailsPage = () => {
                 <div>
                   <p className="text-xs uppercase tracking-wide text-zinc-500">Application Type</p>
                   <p className="mt-1 text-sm font-medium text-zinc-200">{formatApplicationType(application.applicationType)}</p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <p className="text-xs uppercase tracking-wide text-zinc-500">Application ID</p>
+                  <div className="mt-1 inline-flex max-w-full items-center gap-2 rounded-full bg-white/5 px-2.5 py-1 text-xs font-medium text-zinc-300">
+                    <span className="text-zinc-400">ID:</span>
+                    <span className="max-w-[190px] truncate text-zinc-200 sm:max-w-[280px]">{application.id}</span>
+                    <button
+                      type="button"
+                      onClick={(event) => void handleCopyApplicationId(event, application.id)}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded text-zinc-400 transition-colors hover:text-zinc-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                      aria-label="Copy application ID"
+                      title="Copy application ID"
+                    >
+                      {copiedApplicationId === application.id ? (
+                        <Check size={13} weight="bold" />
+                      ) : (
+                        <CopySimple size={13} weight="bold" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-start justify-between gap-3 sm:col-span-2">
