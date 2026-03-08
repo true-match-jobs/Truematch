@@ -182,7 +182,7 @@ export const AdminDashboardConversationsPage = () => {
   };
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-y-auto pt-5 pb-3">
+    <section className="flex h-full min-h-0 flex-col overflow-y-auto pt-5 pb-[calc(10rem+env(safe-area-inset-bottom))]">
       <div className="flex items-center justify-between px-3">
         <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Conversations</h2>
         <div className="flex items-center gap-2">
@@ -234,14 +234,14 @@ export const AdminDashboardConversationsPage = () => {
         </div>
       ) : null}
 
-      <div className="mt-4 min-h-0 flex-1 pb-[calc(7rem+env(safe-area-inset-bottom))]">
+      <div className="mt-4 min-h-0 flex-1">
         {isLoading ? <LoadingSpinner className="py-10" /> : null}
         {!isLoading && errorMessage ? <p className="px-3 py-2 text-sm text-rose-400">{errorMessage}</p> : null}
         {!isLoading && !errorMessage && !conversations.length ? (
           <p className="px-3 py-2 text-sm text-zinc-400">No conversations yet.</p>
         ) : null}
 
-        <ul>
+        <ul className="pb-[calc(10rem+env(safe-area-inset-bottom))]">
           {sortedConversations.map((conversation) => {
             const isUserOnline = Boolean(presenceByUserId[conversation.user.id]);
             const isLastMessageFromAdmin = conversation.lastMessageFromUserId === user?.id;

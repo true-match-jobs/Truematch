@@ -70,10 +70,26 @@ export const ChatMessagesPane = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [loadedImageKeys, setLoadedImageKeys] = useState<Record<string, boolean>>({});
   const [hasInitialBottomPosition, setHasInitialBottomPosition] = useState(false);
+  const [shouldRenderLoadingSpinner, setShouldRenderLoadingSpinner] = useState(false);
   const shouldShowLoadingSpinner = isLoadingConversation && messages.length === 0;
   const shouldHideUntilPositioned = messages.length > 0 && !hasInitialBottomPosition;
 
   useEffect(() => {
+    if (!shouldShowLoadingSpinner) {
+      setShouldRenderLoadingSpinner(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShouldRenderLoadingSpinner(true);
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [shouldShowLoadingSpinner]);
+
+  useLayoutEffect(() => {
     setHasInitialBottomPosition(false);
   }, [peer?.id]);
 
@@ -129,7 +145,7 @@ export const ChatMessagesPane = ({
       className={`flex-1 overflow-y-auto px-4 pt-3 pb-6 ${shouldHideUntilPositioned ? 'invisible' : 'visible'}`}
     >
       <div className={shouldShowLoadingSpinner ? 'flex min-h-full items-center justify-center' : 'flex min-h-full flex-col justify-end gap-4'}>
-        {shouldShowLoadingSpinner ? <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : null}
+        {shouldRenderLoadingSpinner ? <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : null}
 
         {!shouldShowLoadingSpinner && errorMessage ? <p className="text-sm text-rose-400">{errorMessage}</p> : null}
 

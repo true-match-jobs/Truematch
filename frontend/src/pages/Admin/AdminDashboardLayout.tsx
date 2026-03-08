@@ -101,7 +101,7 @@ export const AdminDashboardLayout = () => {
 
             <button
               onClick={handleLogout}
-              className="mt-10 rounded-lg p-3 text-red-500 transition-colors hover:text-red-400"
+              className="rounded-lg p-3 text-red-500 transition-colors hover:text-red-400"
               aria-label="Logout"
             >
               <SignOut size={28} weight="regular" />
