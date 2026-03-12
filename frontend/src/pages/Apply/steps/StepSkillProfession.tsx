@@ -107,7 +107,7 @@ export const StepSkillProfession = ({ onSubmit, onBack, loading, initialValues, 
             id="skillOrProfession"
             type="search"
             placeholder="Search for a skill or profession"
-            className="w-full rounded-xl border border-white/40 bg-transparent py-3 pl-9 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="w-full rounded-xl border border-dark-border bg-dark-surface py-3 pl-9 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-white/70 focus:ring-2 focus:ring-white/20"
             {...register('skillOrProfession')}
           />
         </div>
@@ -145,7 +145,7 @@ export const StepSkillProfession = ({ onSubmit, onBack, loading, initialValues, 
             options={workCountryOptions}
             placeholder="Select a country"
             error={errors.workCountry?.message}
-            className="!border !border-white/40 !bg-transparent !focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         )}
       />
