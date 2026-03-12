@@ -344,13 +344,12 @@ export const ApplyPage = () => {
   };
 
   return (
-    <div className="relative z-10 flex flex-1 flex-col">
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-dark-bg">
+<div className="relative flex min-h-screen flex-col overflow-hidden bg-dark-bg">
   <div aria-hidden className="pointer-events-none absolute inset-0 z-0" style={{ backgroundImage: `linear-gradient(rgba(39,39,42,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(39,39,42,0.4) 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
   <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-0 h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)' }} />
-  <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 h-48" style={{ background: 'linear-gradient(to bottom, transparent, #09090b)' }} />
+  <div aria-hidden className="relative z-10 pointer-events-none absolute bottom-0 left-0 right-0 z-0 h-48" style={{ background: 'linear-gradient(to bottom, transparent, #09090b)' }} />
   <Navbar />
-  <div className="mx-auto w-full max-w-xl px-4 pt-2 sm:px-6 sm:pt-3 lg:px-8">
+  <div className="relative z-10 mx-auto w-full max-w-xl px-4 pt-2 sm:px-6 sm:pt-3 lg:px-8">
     <div className="py-1">
       <Breadcrumbs
         items={[{ label: 'Home', href: '/' }, { label: 'Apply' }]}
@@ -446,6 +445,5 @@ export const ApplyPage = () => {
       </main>
       <Footer />
     </div>
-      </div>
   );
 };
