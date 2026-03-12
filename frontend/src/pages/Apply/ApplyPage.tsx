@@ -376,7 +376,7 @@ export const ApplyPage = () => {
         ) : null}
 
         <div className="flex flex-1 items-center">
-          <div className="w-full space-y-8 rounded-2xl border border-[1px] border-white/40 bg-transparent p-6 sm:p-10">
+          <div className="w-full space-y-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 backdrop-blur-sm sm:p-10">
             <div className="space-y-2 text-left">
               <h1 className="text-2xl font-bold text-white sm:text-3xl">{currentFlowStep.title}</h1>
               <p className="text-sm text-zinc-400">{currentFlowStep.description}</p>
