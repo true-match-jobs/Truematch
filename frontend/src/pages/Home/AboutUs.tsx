@@ -12,7 +12,7 @@ const highlights = [
 ];
 
 const stats = [
-  { value: 'UK & AU', label: 'Destinations' },
+  { value: 'UK, AU & CA', label: 'Destinations' },
   { value: '100%', label: 'Legal Compliance' },
   { value: '1-on-1', label: 'Officer Support' },
 ];
@@ -69,7 +69,7 @@ export const AboutUs = () => {
 
           {/* Highlights */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 backdrop-blur-sm">
-            <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-500/10 text-brand-400">
+            <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-brand-400">
               <GlobeHemisphereWest size={20} weight="fill" aria-hidden />
             </div>
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-widest text-zinc-400">Our Commitments</h3>
