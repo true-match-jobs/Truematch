@@ -77,7 +77,7 @@ export const SelectDropdown = ({
         {isOpen ? (
           <ul
             role="listbox"
-            className="glass-border absolute z-20 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border-white/10 bg-dark-surface py-1"
+            className="glass-border absolute z-50 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border-white/10 bg-dark-surface py-1"
           >
             {options.map((option) => (
               <li key={option.value}>
