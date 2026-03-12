@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Quotes } from '@phosphor-icons/react';
 
 type Testimonial = {
   name: string;
@@ -47,62 +48,142 @@ export const Testimonials = () => {
   useEffect(() => {
     const id = window.setInterval(() => {
       setActiveIndex((i) => (i + 1) % total);
-    }, 9000); // Increased interval for readability
+    }, 9000);
     return () => window.clearInterval(id);
   }, [total]);
 
   const active = testimonials[activeIndex];
 
   return (
-    <section className="bg-dark-bg pb-16 pt-8 sm:pb-20 sm:pt-10">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        {/* Title removed as requested */}
+    <section className="relative bg-dark-bg py-20 sm:py-28">
 
-        <div className="relative mx-auto max-w-4xl rounded-2xl p-6 sm:p-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeIndex}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 1.2, ease: 'easeInOut' }}
-              className="flex flex-col items-center text-center"
-            >
-              <img
-                src={active.image}
-                alt={active.name}
-                className="mt-3 h-20 w-20 rounded-full object-cover ring-2 ring-white/10 sm:h-24 sm:w-24"
-                loading="lazy"
+      {/* Glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 z-0 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl"
+        style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.07) 0%, transparent 70%)' }}
+      />
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+
+        {/* Section label */}
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <span className="h-px w-10 bg-zinc-700" />
+          <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500">Testimonials</span>
+          <span className="h-px w-10 bg-zinc-700" />
+        </div>
+
+        <h2 className="mx-auto max-w-xl text-center text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+          Trusted by people{' '}
+          <span className="text-gradient-brand">across Africa</span>
+        </h2>
+
+        {/* Testimonial card */}
+        <div className="relative mx-auto mt-12 max-w-2xl">
+
+          {/* Decorative quote icon */}
+          <div className="absolute -top-5 left-1/2 z-10 -translate-x-1/2">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 text-brand-400">
+              <Quotes size={18} weight="fill" aria-hidden />
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 backdrop-blur-sm">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeIndex}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                className="flex flex-col items-center px-8 pb-8 pt-10 text-center sm:px-12 sm:pb-10 sm:pt-12"
+              >
+                {/* Quote */}
+                <p className="text-base leading-relaxed text-zinc-300 sm:text-lg">
+                  &ldquo;{active.quote}&rdquo;
+                </p>
+
+                {/* Divider */}
+                <div className="my-6 h-px w-12 bg-zinc-700" />
+
+                {/* Author */}
+                <div className="flex flex-col items-center gap-3">
+                  <img
+                    src={active.image}
+                    alt={active.name}
+                    className="h-14 w-14 rounded-full object-cover ring-2 ring-brand-500/30 sm:h-16 sm:w-16"
+                    loading="lazy"
+                  />
+                  <div>
+                    <p className="text-sm font-semibold text-zinc-100">{active.name}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">{active.country}</p>
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Progress bar */}
+            <div className="h-px w-full bg-zinc-800">
+              <motion.div
+                key={activeIndex}
+                className="h-full bg-brand-500/60"
+                initial={{ width: '0%' }}
+                animate={{ width: '100%' }}
+                transition={{ duration: 9, ease: 'linear' }}
               />
+            </div>
+          </div>
 
-              <div className="mt-6 w-full max-w-2xl px-2 text-zinc-300 sm:px-4">
-                <p className="text-base leading-relaxed sm:text-lg">&quot;{active.quote}&quot;</p>
-              </div>
-
-              <div className="mt-4">
-                <p className="text-base font-semibold text-zinc-100">{active.name},</p>
-                <p className="text-sm text-zinc-400">{active.country}</p>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="mt-7 flex items-center justify-center gap-2">
+          {/* Dot navigation */}
+          <div className="mt-6 flex items-center justify-center gap-2">
             {testimonials.map((testimonial, index) => {
               const isActive = index === activeIndex;
-
               return (
                 <button
                   key={testimonial.name}
                   type="button"
                   onClick={() => setActiveIndex(index)}
                   aria-label={`Show testimonial ${index + 1}`}
-                  className={`h-2 w-2 rounded-full transition-colors duration-300 ease-out ${isActive ? 'bg-white' : 'bg-zinc-600 hover:bg-zinc-500'}`}
+                  className={`rounded-full transition-all duration-300 ${
+                    isActive
+                      ? 'h-2 w-6 bg-brand-500'
+                      : 'h-2 w-2 bg-zinc-700 hover:bg-zinc-500'
+                  }`}
                 />
               );
             })}
           </div>
+
+          {/* Thumbnail strip */}
+          <div className="mt-5 flex items-center justify-center gap-3">
+            {testimonials.map((testimonial, index) => {
+              const isActive = index === activeIndex;
+              return (
+                <button
+                  key={testimonial.name + '-thumb'}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  aria-label={`Show ${testimonial.name}'s testimonial`}
+                  className={`rounded-full transition-all duration-300 ${
+                    isActive
+                      ? 'ring-2 ring-brand-500 ring-offset-2 ring-offset-dark-bg'
+                      : 'opacity-40 hover:opacity-70'
+                  }`}
+                >
+                  <img
+                    src={testimonial.image}
+                    alt={testimonial.name}
+                    className="h-8 w-8 rounded-full object-cover"
+                    loading="lazy"
+                  />
+                </button>
+              );
+            })}
+          </div>
+
         </div>
       </div>
     </section>
   );
 };
+                    
