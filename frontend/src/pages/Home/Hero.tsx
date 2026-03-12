@@ -114,7 +114,7 @@ export const Hero = () => {
         {/* Badge */}
         <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-4 py-1.5 text-xs font-medium tracking-wide text-brand-300">
           <span className="h-1.5 w-1.5 rounded-full bg-brand-400 shadow-[0_0_6px_2px_rgba(167,139,250,0.6)]" />
-          Trusted by global learners worldwide
+          Trusted by job seekers & learners worldwide
         </div>
 
         {/* Headline */}
