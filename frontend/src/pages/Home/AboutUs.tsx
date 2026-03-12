@@ -47,7 +47,7 @@ export const AboutUs = () => {
         <div className="mx-auto mt-8 max-w-3xl space-y-4 text-center text-base leading-relaxed text-zinc-400 sm:text-lg">
           <p>
             We are an international education and workforce consultancy committed to creating global opportunities for Africans.
-            Beyond helping students secure admissions in the <span className="text-zinc-200 font-medium">United Kingdom</span> and <span className="text-zinc-200 font-medium">Australia</span>, we also support foreign job seekers in connecting with verified employers abroad.
+            Beyond helping students secure admissions in the <span className="text-zinc-200 font-medium">United Kingdom, Canada</span> and <span className="text-zinc-200 font-medium">Australia</span>, we also support foreign job seekers in connecting with verified employers abroad.
           </p>
           <p>
             We bridge the gap between talent and opportunity — whether through education or employment. Our mission is to make international study and work pathways <span className="text-zinc-200 font-medium">transparent, simple, and legally compliant</span>.
