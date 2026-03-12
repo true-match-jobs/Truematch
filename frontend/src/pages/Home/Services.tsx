@@ -1,4 +1,4 @@
-import { BookOpenText, FileSearch, Stamp, Briefcase } from '@phosphor-icons/react';
+import { BookOpenText, MagnifyingGlass, Stamp, Briefcase } from '@phosphor-icons/react';
 
 const services = [
   {
@@ -12,7 +12,7 @@ const services = [
   },
   {
     id: '02',
-    icon: FileSearch,
+    icon: MagnifyingGlass,
     title: 'Document Review',
     description:
       'We review and prepare your SOP, CV, transcripts, and references to meet university standards.',
