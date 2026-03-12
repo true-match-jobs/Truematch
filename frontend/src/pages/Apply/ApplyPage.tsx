@@ -341,7 +341,7 @@ export const ApplyPage = () => {
       setSubmitting(false);
     }
   };
-return (
+  return (
   <div className="flex min-h-screen flex-col bg-dark-bg">
     <Navbar />
     <Snackbar
@@ -362,7 +362,7 @@ return (
         }}
       />
       {/* Dark overlay */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-dark-bg/85" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-[1]" style={{ background: 'rgba(9,9,11,0.85)' }} />
       {/* Violet glow */}
       <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-[2] h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.15) 0%, transparent 70%)' }} />
       {/* Fade into footer */}
@@ -373,7 +373,7 @@ return (
           <div className="mb-8 w-full text-left sm:mb-10">
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Start Your Application</h1>
             <p className="mt-2 text-sm leading-relaxed text-zinc-300 sm:text-base">
-              Complete your study or employment application in a few guided steps. Please provide accurate information to help our admissions and recruitment team review your profile efficiently and support your next stage with confidence.
+              Complete your study or employment application in a few guided steps.
             </p>
           </div>
         ) : null}
