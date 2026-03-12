@@ -8,7 +8,7 @@ const services = [
     description:
       'We help you apply to top universities in the UK and Australia with full documentation support.',
     accent: 'text-brand-400',
-    bg: 'bg-brand-500/10',
+    bg: 'bg-violet-500/10',
   },
   {
     id: '02',
