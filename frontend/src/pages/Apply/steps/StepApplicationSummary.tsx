@@ -236,7 +236,7 @@ export const StepApplicationSummary = ({ onSubmit, onBack, loading, initialValue
             options={universityCountryOptions}
             placeholder="Select a country"
             error={errors.universityCountry?.message}
-            className="!border !border-white/40 !bg-transparent !focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         )}
       />
@@ -338,7 +338,7 @@ export const StepApplicationSummary = ({ onSubmit, onBack, loading, initialValue
             options={degreeTypeOptions}
             placeholder="Select a degree type"
             error={errors.degreeType?.message}
-            className="!border !border-white/40 !bg-transparent !focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         )}
       />
@@ -354,7 +354,7 @@ export const StepApplicationSummary = ({ onSubmit, onBack, loading, initialValue
             options={studyModeOptions}
             placeholder="Select study mode"
             error={errors.studyMode?.message}
-            className="!border !border-white/40 !bg-transparent !focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         )}
       />
@@ -371,7 +371,7 @@ export const StepApplicationSummary = ({ onSubmit, onBack, loading, initialValue
             placeholder={universityCountryValue ? 'Select intake' : 'Select country first'}
             error={submitCount > 0 ? errors.intake?.message : undefined}
             disabled={!universityCountryValue}
-            className="!border !border-white/40 !bg-transparent !focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
           />
         )}
       />
