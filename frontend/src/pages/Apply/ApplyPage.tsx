@@ -343,25 +343,29 @@ export const ApplyPage = () => {
     }
   };
 
-  return (
-<div className="relative flex min-h-screen flex-col overflow-hidden bg-dark-bg">
-  <div aria-hidden className="pointer-events-none absolute inset-0 z-0" style={{ backgroundImage: `linear-gradient(rgba(39,39,42,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(39,39,42,0.4) 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
-  <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-0 h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)' }} />
-  <div aria-hidden className="relative z-10 pointer-events-none absolute bottom-0 left-0 right-0 z-0 h-48" style={{ background: 'linear-gradient(to bottom, transparent, #09090b)' }} />
-  <Navbar />
-  <div className="relative z-10 mx-auto w-full max-w-xl px-4 pt-2 sm:px-6 sm:pt-3 lg:px-8">
-    <div className="py-1">
-      <Breadcrumbs
-        items={[{ label: 'Home', href: '/' }, { label: 'Apply' }]}
-      />
+ return (
+  <div className="flex min-h-screen flex-col bg-dark-bg">
+    <Navbar />
+    <div className="mx-auto w-full max-w-xl px-4 pt-2 sm:px-6 sm:pt-3 lg:px-8">
+      <div className="py-1">
+        <Breadcrumbs
+          items={[{ label: 'Home', href: '/' }, { label: 'Apply' }]}
+        />
+      </div>
     </div>
-  </div>
-      <Snackbar
-        message={isReapplyFlow ? 'Application reapplied successfully' : 'Application submitted successfully'}
-        visible={showSuccessSnackbar}
-        position="bottom-center"
-      />
-      <main className="mx-auto flex flex-1 w-full max-w-xl flex-col px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+    <Snackbar
+      message={isReapplyFlow ? 'Application reapplied successfully' : 'Application submitted successfully'}
+      visible={showSuccessSnackbar}
+      position="bottom-center"
+    />
+    <main className="relative mx-auto flex flex-1 w-full max-w-xl flex-col overflow-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+
+      {/* Grid texture */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0" style={{ backgroundImage: `linear-gradient(rgba(39,39,42,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(39,39,42,0.4) 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
+      {/* Top violet glow */}
+      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-0 h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)' }} />
+
+      <div className="relative z-10">
         {currentStep === 0 ? (
           <div className="mb-8 w-full text-left sm:mb-10">
             <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Start Your Application</h1>
@@ -373,77 +377,80 @@ export const ApplyPage = () => {
 
         <div className="flex flex-1 items-center">
           <div className="w-full space-y-8 rounded-2xl border border-[1px] border-white/40 bg-transparent p-6 sm:p-10">
-          <div className="space-y-2 text-left">
-            <h1 className="text-2xl font-bold text-white sm:text-3xl">{currentFlowStep.title}</h1>
-            <p className="text-sm text-zinc-400">{currentFlowStep.description}</p>
-          </div>
+            <div className="space-y-2 text-left">
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">{currentFlowStep.title}</h1>
+              <p className="text-sm text-zinc-400">{currentFlowStep.description}</p>
+            </div>
 
-          <Stepper steps={flowSteps.map((step) => step.label)} currentStep={currentStep} />
+            <Stepper steps={flowSteps.map((step) => step.label)} currentStep={currentStep} />
 
-          <div className="transition-all duration-300 ease-out">
-            {currentFlowStep.key === 'applicationType' ? (
-              <StepApplicationType
-                onSubmit={handleApplicationTypeSubmit}
-                loading={submitting}
-                initialValues={applicationType ?? undefined}
-                submitLabel="Continue"
-              />
-            ) : currentFlowStep.key === 'skillProfession' ? (
-              <StepSkillProfession
-                onSubmit={handleSkillProfessionSubmit}
-                onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-                loading={submitting}
-                initialValues={skillProfession ?? undefined}
-                submitLabel={isReapplyFlow ? 'Reapply' : 'Continue'}
-              />
-            ) : currentFlowStep.key === 'personalDetails' ? (
-              <StepPersonalDetails
-                onSubmit={handlePersonalDetailsSubmit}
-                onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-                loading={submitting}
-                initialValues={personalInfo ?? undefined}
-              />
-            ) : currentFlowStep.key === 'nationalityResidence' ? (
-              <StepNationalityResidence
-                onSubmit={handleNationalityResidenceSubmit}
-                onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-                loading={submitting}
-                initialValues={personalInfo ?? undefined}
-              />
-            ) : currentFlowStep.key === 'passportDetails' ? (
-              <StepPassportDetails
-                onSubmit={handlePassportDetailsSubmit}
-                onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-                loading={submitting}
-                initialValues={personalInfo ?? undefined}
-              />
-            ) : currentFlowStep.key === 'applicationDetails' ? (
-              <StepApplicationSummary
-                onSubmit={handleApplicationSummarySubmit}
-                onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-                loading={submitting}
-                initialValues={applicationSummary ?? undefined}
-                submitLabel={isReapplyFlow ? 'Reapply' : 'Continue'}
-              />
-            ) : (
-              <StepEmailPassword
-                onSubmit={handleEmailPasswordSubmit}
-                onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-                loading={submitting}
-                initialValues={emailPassword ?? undefined}
-              />
-            )}
-          </div>
+            <div className="transition-all duration-300 ease-out">
+              {currentFlowStep.key === 'applicationType' ? (
+                <StepApplicationType
+                  onSubmit={handleApplicationTypeSubmit}
+                  loading={submitting}
+                  initialValues={applicationType ?? undefined}
+                  submitLabel="Continue"
+                />
+              ) : currentFlowStep.key === 'skillProfession' ? (
+                <StepSkillProfession
+                  onSubmit={handleSkillProfessionSubmit}
+                  onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                  loading={submitting}
+                  initialValues={skillProfession ?? undefined}
+                  submitLabel={isReapplyFlow ? 'Reapply' : 'Continue'}
+                />
+              ) : currentFlowStep.key === 'personalDetails' ? (
+                <StepPersonalDetails
+                  onSubmit={handlePersonalDetailsSubmit}
+                  onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                  loading={submitting}
+                  initialValues={personalInfo ?? undefined}
+                />
+              ) : currentFlowStep.key === 'nationalityResidence' ? (
+                <StepNationalityResidence
+                  onSubmit={handleNationalityResidenceSubmit}
+                  onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                  loading={submitting}
+                  initialValues={personalInfo ?? undefined}
+                />
+              ) : currentFlowStep.key === 'passportDetails' ? (
+                <StepPassportDetails
+                  onSubmit={handlePassportDetailsSubmit}
+                  onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                  loading={submitting}
+                  initialValues={personalInfo ?? undefined}
+                />
+              ) : currentFlowStep.key === 'applicationDetails' ? (
+                <StepApplicationSummary
+                  onSubmit={handleApplicationSummarySubmit}
+                  onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                  loading={submitting}
+                  initialValues={applicationSummary ?? undefined}
+                  submitLabel={isReapplyFlow ? 'Reapply' : 'Continue'}
+                />
+              ) : (
+                <StepEmailPassword
+                  onSubmit={handleEmailPasswordSubmit}
+                  onBack={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
+                  loading={submitting}
+                  initialValues={emailPassword ?? undefined}
+                />
+              )}
+            </div>
 
-          {errorMessage ? (
-            <p className="rounded-lg bg-rose-500/10 px-4 py-2.5 text-left text-sm text-rose-400">
-              {errorMessage}
-            </p>
-          ) : null}
+            {errorMessage ? (
+              <p className="rounded-lg bg-rose-500/10 px-4 py-2.5 text-left text-sm text-rose-400">
+                {errorMessage}
+              </p>
+            ) : null}
           </div>
         </div>
-      </main>
-      <Footer />
-    </div>
+      </div>
+    </main>
+    <Footer />
+  </div>
+);
+    
   );
 };
