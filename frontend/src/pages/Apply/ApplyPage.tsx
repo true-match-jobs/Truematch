@@ -362,11 +362,11 @@ return (
         }}
       />
       {/* Dark overlay */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 bg-dark-bg/85" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-[1] bg-dark-bg/85" />
       {/* Violet glow */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-0 h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.15) 0%, transparent 70%)' }} />
+      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-[2] h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.15) 0%, transparent 70%)' }} />
       {/* Fade into footer */}
-      <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 h-32" style={{ background: 'linear-gradient(to bottom, transparent, #09090b)' }} />
+      <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 right-0 z-[2] h-32" style={{ background: 'linear-gradient(to bottom, transparent, #09090b)' }} />
 
       <div className="relative z-10">
         {currentStep === 0 ? (
@@ -453,5 +453,5 @@ return (
     </main>
     <Footer />
   </div>
-  );             
+  );
 };
