@@ -3,7 +3,6 @@ import type { AxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Footer } from '../../components/layout/Footer';
 import { Navbar } from '../../components/layout/Navbar';
-import { Breadcrumbs } from '../../components/ui/Breadcrumbs';
 import { Snackbar } from '../../components/ui/Snackbar';
 import { Stepper } from '../../components/ui/Stepper';
 import { SNACKBAR_AUTO_DISMISS_DELAY_MS } from '../../constants/snackbar';
@@ -346,13 +345,6 @@ export const ApplyPage = () => {
  return (
   <div className="flex min-h-screen flex-col bg-dark-bg">
     <Navbar />
-    <div className="mx-auto w-full max-w-xl px-4 pt-2 sm:px-6 sm:pt-3 lg:px-8">
-      <div className="py-1">
-        <Breadcrumbs
-          items={[{ label: 'Home', href: '/' }, { label: 'Apply' }]}
-        />
-      </div>
-    </div>
     <Snackbar
       message={isReapplyFlow ? 'Application reapplied successfully' : 'Application submitted successfully'}
       visible={showSuccessSnackbar}
