@@ -255,7 +255,7 @@ export const StepApplicationSummary = ({ onSubmit, onBack, loading, initialValue
             id="universityName"
             type="search"
             placeholder="Search for your university"
-            className="w-full rounded-xl border border-white/40 bg-transparent py-3 pl-9 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             disabled={!universityCountryValue}
             {...register('universityName')}
           />
@@ -301,7 +301,7 @@ export const StepApplicationSummary = ({ onSubmit, onBack, loading, initialValue
             id="courseName"
             type="search"
             placeholder="Search for your course type (e.g., Data Science)"
-            className="w-full rounded-xl border border-white/40 bg-transparent py-3 pl-9 pr-4 text-sm text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-white/70 focus:ring-2 focus:ring-white/20"
+            className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             {...register('courseName')}
           />
         </div>
