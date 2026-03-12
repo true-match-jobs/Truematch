@@ -35,7 +35,7 @@ export const Navbar = ({ leftContent, centerContent }: NavbarProps) => {
           <div className="flex items-center gap-3">
             <Link
               to={loginTarget}
-              className="inline-flex items-center justify-center rounded-lg border border-white/40 bg-transparent px-4 py-2 text-sm font-medium text-white transition-all duration-200 hover:bg-white/5"
+              className="inline-flex items-center justify-center rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_1px_3px_rgba(0,0,0,0.4)] backdrop-blur-sm transition-all duration-200 hover:bg-white/10 hover:border-white/30"
             >
               {user ? 'Dashboard' : 'Login'}
             </Link>
