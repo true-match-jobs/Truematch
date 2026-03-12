@@ -341,8 +341,7 @@ export const ApplyPage = () => {
       setSubmitting(false);
     }
   };
-
- return (
+return (
   <div className="flex min-h-screen flex-col bg-dark-bg">
     <Navbar />
     <Snackbar
@@ -352,10 +351,22 @@ export const ApplyPage = () => {
     />
     <main className="relative mx-auto flex flex-1 w-full max-w-xl flex-col overflow-hidden px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
 
-      {/* Grid texture */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-0" style={{ backgroundImage: `linear-gradient(rgba(39,39,42,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(39,39,42,0.4) 1px, transparent 1px)`, backgroundSize: '40px 40px' }} />
-      {/* Top violet glow */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-0 h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.18) 0%, transparent 70%)' }} />
+      {/* Background image */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{
+          backgroundImage: `url('https://images.unsplash.com/photo-1521737852567-6949f3f9f2b5?w=1200&auto=format&fit=crop&q=80')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      />
+      {/* Dark overlay */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 bg-dark-bg/85" />
+      {/* Violet glow */}
+      <div aria-hidden className="pointer-events-none absolute -top-32 left-1/2 z-0 h-[480px] w-[700px] -translate-x-1/2 rounded-full blur-3xl" style={{ background: 'radial-gradient(ellipse, rgba(139,92,246,0.15) 0%, transparent 70%)' }} />
+      {/* Fade into footer */}
+      <div aria-hidden className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 h-32" style={{ background: 'linear-gradient(to bottom, transparent, #09090b)' }} />
 
       <div className="relative z-10">
         {currentStep === 0 ? (
@@ -442,5 +453,5 @@ export const ApplyPage = () => {
     </main>
     <Footer />
   </div>
-  );
+  );             
 };
