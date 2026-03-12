@@ -75,6 +75,7 @@ export const StepPersonalDetails = ({ onSubmit, loading, initialValues, onBack }
             error={errors.gender?.message}
           />
         )}
+        className="!border !border-dark-border !bg-dark-surface focus:!border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
       <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-3">
         <Input
