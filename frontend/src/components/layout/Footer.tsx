@@ -1,6 +1,6 @@
 export const Footer = () => {
   return (
-    <footer className="mt-12 glass-border-t bg-dark-bg">
+    <footer className="pt-12 bg-dark-bg">
       <div className="mx-auto w-full max-w-6xl px-4 py-6 text-sm text-zinc-400 sm:px-6 lg:px-8">
         <div className="text-sm text-zinc-400 text-center max-w-3xl mx-auto">
           <p className="mb-2 font-semibold">Disclaimer:</p>
