@@ -13,7 +13,7 @@ export const Input = ({ label, id, error, className = '', ...props }: Props) => 
       </label>
       <input
         id={id}
-        className={`w-full rounded-xl border border-white/40 bg-transparent px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-white/70 focus:ring-2 focus:ring-white/20 ${className}`}
+        className={`w-full rounded-xl border border-dark-border bg-dark-surface px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none transition-all duration-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${className}`}
         {...props}
       />
       {error ? <p className="mt-1 text-xs text-rose-400">{error}</p> : null}
