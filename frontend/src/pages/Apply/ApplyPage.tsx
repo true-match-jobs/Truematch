@@ -450,7 +450,5 @@ export const ApplyPage = () => {
     </main>
     <Footer />
   </div>
-);
-    
   );
 };
